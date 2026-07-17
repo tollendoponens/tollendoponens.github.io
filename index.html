@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Victor Chung</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+<script src="nav.js"></script>
+
+<div class="container">
+
+<div class="intro">
+  <div class="intro-text">
+    <h1>Victor Chung</h1>
+    <div class="subtitle">
+      Graduate Student, Philosophy<br>
+      <a class="link" href="https://philosophy.utoronto.ca/directory/victor-chung/" target="_blank">University of Toronto</a>
+    </div>
+    <div class="bio">
+      <p>I'm interested in business ethics, political philosophy, and the philosophy of economics. Currently working on the ethics of labour relations.</p>
+      <p>Here's my <a class="link" href="cv.pdf" target="_blank">CV</a>.</p>
+    </div>
+  </div>
+
+  <div class="intro-image">
+    <img src="photo.JPG" alt="Victor Chung">
+  </div>
+</div>
+
+  <div class="section">
+    <div class="section-title">PEER-REVIEWED PUBLICATIONS</div>
+    <div id="publications"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">CONTACT</div>
+
+    <div class="item">
+      <div class="item-meta">vic (dot) chung (at) mail (dot) utoronto (dot) ca</div>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="papers.js"></script>
+<script>renderPublications(document.getElementById('publications'));</script>
+
+</body>
+</html>
