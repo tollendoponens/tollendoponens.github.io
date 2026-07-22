@@ -249,7 +249,10 @@ document.getElementById('connection-count').innerText = peerKeys.length;
 const select = document.getElementById('trade-target');
 select.innerHTML = '-- Select Connected Classmate --';
 peerKeys.forEach(id => {
-select.innerHTML += <option value="${id}">${id.substring(0, 6)}... (Classmate)</option>;
+select.innerHTML += `
+<option value="${id}">
+    ${id.substring(0, 6)}... (Classmate)
+</option>`;
 });
 }
 function logAction(text) {
