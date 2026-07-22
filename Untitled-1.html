@@ -92,18 +92,33 @@
 
     // Initialize PeerJS on window load using their free public cloud handshake server
     window.onload = function() {
-        peer = new Peer();
+        // 1. Generate a random, clean readable room ID directly inside the browser
+        const randomId = "class-" + Math.floor(1000 + Math.random() * 9000);
 
-        peer.on('open', (id) => {
-            document.getElementById('my-id').innerText = id;
-            logAction("Connected to matchmaking server. Share your ID with classmates!");
+        // 2. Initialize PeerJS with the generated ID and a backup cloud server configuration
+        peer = new Peer(randomId, {
+            host: '0.peerjs.com', // Explicitly declare the primary cloud server
+            port: 443,
+            secure: true,
+            pingInterval: 5000 // Keeps the connection alive on strict networks
         });
 
-        // Handle incoming connections from classmates
+        // This triggers immediately because the ID was generated locally!
+        document.getElementById('my-id').innerText = randomId;
+        logAction("ID assigned locally. Share this ID with classmates!");
+
+        // Catch connection errors cleanly
+        peer.on('error', (err) => {
+            console.error("PeerJS Error: ", err.type, err);
+            logAction(`⚠️ Connection Issue: ${err.type}. Check firewall or reload.`);
+        });
+
+        // Listen for incoming classmates
         peer.on('connection', (conn) => {
             setupConnectionListeners(conn);
         });
     };
+
 
     // Connect manually to a classmate using their ID
     function connectToPeer() {
