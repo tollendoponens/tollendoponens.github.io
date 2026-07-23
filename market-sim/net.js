@@ -22,8 +22,12 @@ const MSG = {
   // student -> host
   HELLO: "hello",
   PING: "ping",
+  // Both sides post, and either side may accept what the other has left
+  // resting — that pair of pairs is what makes it a double auction.
   OFFER: "offer",        // producer posts a sell offer: { good, price }
-  BUY: "buy",            // consumer accepts a standing offer: { good, seq }
+  BID: "bid",            // consumer posts a buy offer:  { good, price }
+  BUY: "buy",            // consumer lifts the standing ask: { good, seq }
+  SELL: "sell",          // producer hits the standing bid: { good, seq }
 };
 
 const Net = {

@@ -239,7 +239,9 @@ function wireHost() {
   });
 
   Net.on(MSG.OFFER, (payload, peerId) => handleOffer(peerId, payload));
+  Net.on(MSG.BID, (payload, peerId) => handleBid(peerId, payload));
   Net.on(MSG.BUY, (payload, peerId) => handleBuy(peerId, payload));
+  Net.on(MSG.SELL, (payload, peerId) => handleSell(peerId, payload));
 
   Net.onDisconnect((peerId) => {
     const s = session.students[peerId];
@@ -280,110 +282,218 @@ function reject(peerId, text) {
   Net.sendTo(peerId, MSG.TOAST, { text });
 }
 
-function handleOffer(peerId, payload) {
-  const s = session.students[peerId];
-  if (!s) return;
-  if (!isRoundOpen(session)) return reject(peerId, "The market is closed.");
-  if (s.role !== ROLE.PRODUCER) return reject(peerId, "Only producers post offers.");
+/* ---------------- the double auction ----------------
+ * Both sides post. A sell offer that meets the standing bid — or a buy offer
+ * that meets the standing ask — trades on the spot, at the RESTING order's
+ * price: whoever committed to a number first sets the terms, which is what
+ * makes posting worth doing rather than always waiting to accept.
+ *
+ * Only the best order rests on each side, and a new one must strictly improve
+ * on it. Since any crossing pair trades immediately, a resting bid is always
+ * strictly below a resting ask, so at most one of the two checks can fire.
+ */
 
-  const good = activeGoods(session).includes(payload.good) ? payload.good : activeGoods(session)[0];
+/** Shared validation for anyone putting a price into a book. Returns null and
+ *  tells the student why, or the resolved order if it is allowed to proceed. */
+function validateOrder(peerId, student, payload, wantRole, verb) {
+  const deny = (text) => { reject(peerId, text); return null; };
+
+  if (!isRoundOpen(session)) return deny("The market is closed.");
+  if (student.role !== wantRole) {
+    return deny(wantRole === ROLE.PRODUCER
+      ? "Only producers post sell offers." : "Only consumers post buy offers.");
+  }
+  const good = activeGoods(session).includes(payload && payload.good)
+    ? payload.good : activeGoods(session)[0];
   const book = session.market.books[good];
-  if (!book) return;
+  if (!book) return null;
 
-  const unit = nextUnit(s, good);
-  if (!unit) return reject(peerId, `No ${goodName(good).toLowerCase()} units left to sell.`);
-  if (capacityLeft(s, session.params) <= 0) {
-    return reject(peerId, "You've used your whole production capacity this round.");
+  const unit = nextUnit(student, good);
+  if (!unit) return deny(`No ${goodName(good).toLowerCase()} units left to ${verb}.`);
+  if (capacityLeft(student, session.params) <= 0) {
+    return deny("You've used your whole capacity this round.");
   }
 
   // Whole dollars only — the schedules are integers and so is the book.
   const price = Number(payload.price);
   if (!Number.isInteger(price) || price <= 0) {
-    return reject(peerId, "Offers must be a whole number of dollars.");
+    return deny("Prices must be a whole number of dollars.");
   }
-
-  // Price controls, if the instructor set any.
   const { priceFloor, priceCeiling } = session.params;
-  if (priceFloor != null && price < priceFloor) {
-    return reject(peerId, `Price floor: no offers below ${money(priceFloor)}.`);
-  }
-  if (priceCeiling != null && price > priceCeiling) {
-    return reject(peerId, `Price ceiling: no offers above ${money(priceCeiling)}.`);
+  if (priceFloor != null && price < priceFloor) return deny(`Price floor: nothing below ${money(priceFloor)}.`);
+  if (priceCeiling != null && price > priceCeiling) return deny(`Price ceiling: nothing above ${money(priceCeiling)}.`);
+  return { good, book, unit, price };
+}
+
+/** Append an order to the book's event stream; returns its index. */
+function pushOrder(book, side, price, student) {
+  book.events.push({
+    kind: "offer",
+    side,
+    price,
+    byId: student.id,
+    byName: student.name,
+    ts: Date.now(),
+    status: "standing",
+  });
+  return book.events.length - 1;
+}
+
+/** The counterparty still has to be able to trade. A resting order whose owner
+ *  has since run out is withdrawn rather than executed against. */
+function restingIsLive(good, ownerId) {
+  const who = session.students[ownerId];
+  const unit = who && nextUnit(who, good);
+  if (!unit || capacityLeft(who, session.params) <= 0) return null;
+  return { who, unit };
+}
+
+function handleOffer(peerId, payload) {
+  const s = session.students[peerId];
+  if (!s) return;
+  const v = validateOrder(peerId, s, payload, ROLE.PRODUCER, "sell");
+  if (!v) return;
+  const { good, book, unit, price } = v;
+
+  // Crossing the standing bid: trade now, at the bid's price.
+  const bid = book.bid;
+  if (bid && price <= bid.price) {
+    const other = restingIsLive(good, bid.buyerId);
+    if (!other) {
+      book.bid = null;
+      return reject(peerId, "That buyer has nothing left — their bid was withdrawn.");
+    }
+    markEvent(book, bid.eventIndex, "executed");
+    markEvent(book, pushOrder(book, "sell", price, s), "executed");
+    book.bid = null;   // consumed — off the book before the clear-out below
+    return executeTrade(good, s, unit, other.who, other.unit, bid.price);
   }
 
-  // One offer stands per good, and it is the best one. A new offer must
-  // strictly undercut the standing offer to replace it.
   const ask = book.ask;
   if (ask && price >= ask.price) {
-    return reject(peerId, `You must undercut the standing ${goodName(good).toLowerCase()} offer of ${money(ask.price)}.`);
+    return reject(peerId,
+      `You must undercut the standing ${goodName(good).toLowerCase()} offer of ${money(ask.price)}.`);
   }
-
   if (ask) {
-    const beaten = book.events[ask.eventIndex];
-    if (beaten) beaten.status = "beaten";
+    markEvent(book, ask.eventIndex, "beaten");
     if (ask.sellerId !== peerId) {
       reject(ask.sellerId, `${s.name} undercut your ${goodName(good).toLowerCase()} offer at ${money(price)}.`);
     }
   }
 
   book.seq += 1;
-  book.events.push({
-    kind: "offer",
-    price,
-    sellerId: peerId,
-    sellerName: s.name,
-    ts: Date.now(),
-    status: "standing",
-  });
   book.ask = {
-    sellerId: peerId,
-    sellerName: s.name,
-    price,
-    seq: book.seq,
-    eventIndex: book.events.length - 1,
+    sellerId: peerId, sellerName: s.name, price,
+    seq: book.seq, eventIndex: pushOrder(book, "sell", price, s),
   };
-  s.lastAction = `offered ${goodName(good)} ${money(price)}`;
-  pushLog(session, `${s.name} offers ${goodName(good)} at ${money(price)}`);
+  s.lastAction = `asked ${goodName(good)} ${money(price)}`;
+  pushLog(session, `${s.name} offers to sell ${goodName(good)} at ${money(price)}`);
   syncAll();
 }
 
-function handleBuy(peerId, payload) {
-  const buyer = session.students[peerId];
-  if (!buyer) return;
+function handleBid(peerId, payload) {
+  const s = session.students[peerId];
+  if (!s) return;
+  const v = validateOrder(peerId, s, payload, ROLE.CONSUMER, "buy");
+  if (!v) return;
+  const { good, book, unit, price } = v;
+
+  // Crossing the standing ask: trade now, at the ask's price.
+  const ask = book.ask;
+  if (ask && price >= ask.price) {
+    const other = restingIsLive(good, ask.sellerId);
+    if (!other) {
+      book.ask = null;
+      return reject(peerId, "That seller has nothing left — their offer was withdrawn.");
+    }
+    markEvent(book, ask.eventIndex, "executed");
+    markEvent(book, pushOrder(book, "buy", price, s), "executed");
+    book.ask = null;   // consumed — off the book before the clear-out below
+    return executeTrade(good, other.who, other.unit, s, unit, ask.price);
+  }
+
+  const bid = book.bid;
+  if (bid && price <= bid.price) {
+    return reject(peerId,
+      `You must beat the standing ${goodName(good).toLowerCase()} bid of ${money(bid.price)}.`);
+  }
+  if (bid) {
+    markEvent(book, bid.eventIndex, "beaten");
+    if (bid.buyerId !== peerId) {
+      reject(bid.buyerId, `${s.name} outbid your ${goodName(good).toLowerCase()} bid at ${money(price)}.`);
+    }
+  }
+
+  book.seq += 1;
+  book.bid = {
+    buyerId: peerId, buyerName: s.name, price,
+    seq: book.seq, eventIndex: pushOrder(book, "buy", price, s),
+  };
+  s.lastAction = `bid ${goodName(good)} ${money(price)}`;
+  pushLog(session, `${s.name} offers to buy ${goodName(good)} at ${money(price)}`);
+  syncAll();
+}
+
+function markEvent(book, index, status) {
+  const e = book.events[index];
+  if (e) e.status = status;
+}
+
+/** Accepting what is already resting — the one-click path, so nobody has to
+ *  type a price just to say yes. `side` is the resting order being taken. */
+function acceptResting(peerId, payload, side) {
+  const taker = session.students[peerId];
+  if (!taker) return;
   if (!isRoundOpen(session)) return reject(peerId, "The market is closed.");
-  if (buyer.role !== ROLE.CONSUMER) return reject(peerId, "Only consumers buy.");
+
+  const wantRole = side === "ask" ? ROLE.CONSUMER : ROLE.PRODUCER;
+  if (taker.role !== wantRole) {
+    return reject(peerId, side === "ask" ? "Only consumers buy." : "Only producers sell.");
+  }
 
   const good = activeGoods(session).includes(payload && payload.good)
     ? payload.good : activeGoods(session)[0];
   const book = session.market.books[good];
   if (!book) return;
 
-  const ask = book.ask;
-  if (!ask) return reject(peerId, "There is no offer on that book.");
-  // Guard against a stale click: the offer may have been undercut mid-click.
-  if (payload && payload.seq && payload.seq !== ask.seq) {
-    return reject(peerId, "That offer was replaced. Check the new price.");
+  const resting = side === "ask" ? book.ask : book.bid;
+  if (!resting) {
+    return reject(peerId, side === "ask"
+      ? "There is no sell offer on that book." : "There is no buy offer on that book.");
+  }
+  // Guard against a stale click: the order may have been replaced mid-click.
+  if (payload && payload.seq && payload.seq !== resting.seq) {
+    return reject(peerId, "That order was replaced. Check the new price.");
   }
 
-  const buyerUnit = nextUnit(buyer, good);
-  if (!buyerUnit) return reject(peerId, `No ${goodName(good).toLowerCase()} units left to buy.`);
-  if (capacityLeft(buyer, session.params) <= 0) {
-    return reject(peerId, "You've spent your whole capacity this round.");
+  const takerUnit = nextUnit(taker, good);
+  if (!takerUnit) return reject(peerId, `No ${goodName(good).toLowerCase()} units left.`);
+  if (capacityLeft(taker, session.params) <= 0) {
+    return reject(peerId, "You've used your whole capacity this round.");
   }
 
-  const seller = session.students[ask.sellerId];
-  const sellerUnit = seller && nextUnit(seller, good);
-  if (!sellerUnit || capacityLeft(seller, session.params) <= 0) {
-    book.ask = null;
-    return reject(peerId, "That seller has nothing left. The offer was withdrawn.");
+  const ownerId = side === "ask" ? resting.sellerId : resting.buyerId;
+  const other = restingIsLive(good, ownerId);
+  if (!other) {
+    if (side === "ask") book.ask = null; else book.bid = null;
+    return reject(peerId, "The other side has nothing left. That order was withdrawn.");
   }
 
-  const price = ask.price;
+  markEvent(book, resting.eventIndex, "executed");
+  if (side === "ask") book.ask = null; else book.bid = null;   // consumed
+  return side === "ask"
+    ? executeTrade(good, other.who, other.unit, taker, takerUnit, resting.price)
+    : executeTrade(good, taker, takerUnit, other.who, other.unit, resting.price);
+}
+
+const handleBuy = (peerId, payload) => acceptResting(peerId, payload, "ask");
+const handleSell = (peerId, payload) => acceptResting(peerId, payload, "bid");
+
+/** The single place a trade is booked, whichever way the two sides arrived. */
+function executeTrade(good, seller, sellerUnit, buyer, buyerUnit, price) {
+  const book = session.market.books[good];
   sellerUnit.price = price;
   buyerUnit.price = price;
-
-  const executed = book.events[ask.eventIndex];
-  if (executed) executed.status = "executed";
 
   session.market.trades.push({
     good,
@@ -403,7 +513,21 @@ function handleBuy(peerId, payload) {
     buyerName: buyer.name,
     ts: Date.now(),
   });
-  book.ask = null;   // a purchase clears that book
+  // A trade clears both sides: the chart starts a new column and any price may
+  // open it again, from either direction. An order that was still resting on
+  // the far side is cancelled, not executed — say so on the book and tell the
+  // person, rather than leaving it looking live on the chart.
+  [["ask", book.ask, "sellerId"], ["bid", book.bid, "buyerId"]].forEach(([side, resting, idKey]) => {
+    if (!resting) return;
+    markEvent(book, resting.eventIndex, "cleared");
+    const ownerId = resting[idKey];
+    if (ownerId !== seller.id && ownerId !== buyer.id) {
+      reject(ownerId, `Your ${goodName(good).toLowerCase()} ${side === "ask" ? "sell" : "buy"} offer of `
+        + `${money(resting.price)} cleared when the trade went through — post again.`);
+    }
+  });
+  book.ask = null;
+  book.bid = null;
 
   // The spillover is real money. Everyone EXCEPT the two people who did the
   // deal pays it; the traders keep their whole gain. That gap is the lesson.
@@ -481,7 +605,7 @@ function openMarket() {
 
 function closeMarket() {
   session.endsAt = null;
-  eachBook(session, (book) => { book.ask = null; });  // standing offers expire
+  eachBook(session, (book) => { book.ask = null; book.bid = null; });  // resting orders expire
   archiveRound(session);       // keep this round available to the chart picker
   studentList(session).forEach((s) => {
     const net = roundNet(s);          // trading surplus plus what others cost them
@@ -586,13 +710,20 @@ function applyControls() {
 
   pushLog(session, priceControlText(p), { toStudents: true });
   Net.broadcast(MSG.TOAST, { text: priceControlText(p) });
-  // A standing offer that the new control outlaws can't be left on the book.
+  // A resting order that the new control outlaws can't be left on the book —
+  // on either side. A ceiling typically kills asks, a floor typically kills
+  // bids, but both are checked against both.
+  const illegal = (price) => (floor != null && price < floor) || (ceiling != null && price > ceiling);
   eachBook(session, (book, g) => {
-    const ask = book.ask;
-    if (ask && ((floor != null && ask.price < floor) || (ceiling != null && ask.price > ceiling))) {
-      book.ask = null;
-      pushLog(session, `Standing ${goodName(g).toLowerCase()} offer of ${money(ask.price)} withdrawn — outside the new limits`,
+    if (book.ask && illegal(book.ask.price)) {
+      pushLog(session, `Standing ${goodName(g).toLowerCase()} sell offer of ${money(book.ask.price)} withdrawn — outside the new limits`,
         { toStudents: true });
+      book.ask = null;
+    }
+    if (book.bid && illegal(book.bid.price)) {
+      pushLog(session, `Standing ${goodName(g).toLowerCase()} buy offer of ${money(book.bid.price)} withdrawn — outside the new limits`,
+        { toStudents: true });
+      book.bid = null;
     }
   });
   syncAll();
@@ -758,7 +889,11 @@ function openInspector(id) {
       // Their old schedule is the wrong side of the market now; re-deal everyone
       // so the aggregate curves stay the shape the instructor asked for.
       rollAllSchedules(session);
-      eachBook(session, (book) => { if (book.ask && book.ask.sellerId === s.id) book.ask = null; });
+      // They're on the other side of the market now; pull whatever they left resting.
+      eachBook(session, (book) => {
+        if (book.ask && book.ask.sellerId === s.id) book.ask = null;
+        if (book.bid && book.bid.buyerId === s.id) book.bid = null;
+      });
       pushLog(session, `${s.name} switched to ${s.role} — schedules re-dealt`);
       syncAll();
     },
@@ -808,27 +943,36 @@ function wireClient() {
   Net.on(MSG.KICK, () => { location.reload(); });
 
   // Market blocks are rebuilt per good on every render, so actions are delegated.
+  // Four paths: post a price on either side, or accept what's already resting
+  // on either side. `postGood` is the typed order, `takeGood` the one click.
   $("s-markets").onclick = (e) => {
     const t = e.target;
-    if (t.dataset.offerGood) {
-      const good = t.dataset.offerGood;
+
+    if (t.dataset.postGood) {
+      const good = t.dataset.postGood;
       const input = document.getElementById(`s-offer-${good}`);
       const price = Number(input.value);
       if (!Number.isInteger(price) || price <= 0) {
-        UI.toast("Offers must be a whole number of dollars.");
+        UI.toast("Prices must be a whole number of dollars.");
         return;
       }
-      Net.send(MSG.OFFER, { good, price });
+      Net.send(view.me && view.me.role === ROLE.PRODUCER ? MSG.OFFER : MSG.BID, { good, price });
       input.value = "";
-    } else if (t.dataset.buyGood) {
-      const good = t.dataset.buyGood;
+      return;
+    }
+
+    if (t.dataset.takeGood) {
+      const good = t.dataset.takeGood;
       const book = view.market.books[good];
-      if (!book || !book.ask) return;
-      Net.send(MSG.BUY, { good, seq: book.ask.seq });
+      if (!book) return;
+      const isProducer = view.me && view.me.role === ROLE.PRODUCER;
+      // A producer accepts the resting bid; a consumer accepts the resting ask.
+      const resting = isProducer ? book.bid : book.ask;
+      if (!resting) return;
+      Net.send(isProducer ? MSG.SELL : MSG.BUY, { good, seq: resting.seq });
       t.disabled = true;
     }
   };
-
 }
 
 /* ================= shared ================= */
@@ -901,20 +1045,37 @@ function startPreview(which) {
   const goods = activeGoods(session);
   const producers = ["peer-0", "peer-2", "peer-4", "peer-6", "peer-8"];
   const consumers = ["peer-1", "peer-3", "peer-5", "peer-7", "peer-9"];
+  // Both sides walk toward each other, then one of them crosses — so the
+  // preview shows the two ladders and a trade, not a one-sided slide.
   const runTrades = (count) => {
     for (let t = 0; t < count; t++) {
       const good = goods[t % goods.length];
       const book = session.market.books[good];
-      let price = 20 - t;
-      producers.slice(0, 3).forEach((p, k) => {
+      const top = 20 - t;
+
+      producers.slice(0, 3).forEach((p) => {
         const s = session.students[p];
         if (!nextUnit(s, good) || capacityLeft(s, session.params) <= 0) return;
-        const ask = book.ask;
-        const want = ask ? ask.price - 1 : price;
+        const want = book.ask ? book.ask.price - 1 : top;
         if (want > 0) handleOffer(p, { good, price: want });
       });
-      const buyer = consumers[t % consumers.length];
-      if (book.ask) handleBuy(buyer, { good, seq: book.ask.seq });
+      consumers.slice(0, 3).forEach((c) => {
+        const s = session.students[c];
+        if (!nextUnit(s, good) || capacityLeft(s, session.params) <= 0) return;
+        // Climb, but stop short of the ask so the bid rests instead of crossing.
+        const floorBid = book.bid ? book.bid.price + 1 : Math.max(1, top - 6);
+        if (book.ask && floorBid >= book.ask.price) return;
+        handleBid(c, { good, price: floorBid });
+      });
+
+      // Close it by accepting, alternating which side reaches across.
+      if (t % 2 === 0 && book.ask) {
+        handleBuy(consumers[t % consumers.length], { good, seq: book.ask.seq });
+      } else if (book.bid) {
+        handleSell(producers[t % producers.length], { good, seq: book.bid.seq });
+      } else if (book.ask) {
+        handleBuy(consumers[t % consumers.length], { good, seq: book.ask.seq });
+      }
     }
   };
 

@@ -1,8 +1,9 @@
 # Classroom double auction
 
 A live, multi-computer classroom market. The instructor opens and closes the
-market; producers post sell offers; consumers accept them. Everyone watches the
-same offer chart. Runs entirely on GitHub Pages — no backend.
+market; **both sides post prices, and either side can accept the other's**.
+Everyone watches the same order chart. Runs entirely on GitHub Pages — no
+backend.
 
 This is **step one** of a larger simulation, not the finished thing.
 
@@ -91,12 +92,13 @@ quantity marked. A negative spillover puts it above supply and the market
 over-trades; a positive one puts it below and the market under-trades.
 
 **Price controls.** The instructor can set a floor, a ceiling, both, or neither
-(blank = none); they apply immediately, at any point in a round. Offers outside
-the limits are refused **on the host**, and a standing offer that a newly
-applied control outlaws is withdrawn from the book rather than left sitting
-there illegally. A floor above a ceiling is refused outright — nothing would be
-legal. Students see the active limits beside the book and as dashed lines on the
-chart; the offer hint folds the floor into the price they're told to beat.
+(blank = none); they apply immediately, at any point in a round. Orders outside
+the limits are refused **on the host**, on **both sides** — and a resting order
+that a newly applied control outlaws is withdrawn rather than left sitting there
+illegally, again on both sides. A ceiling typically kills asks and a floor
+typically kills bids, but each is checked against both. A floor above a ceiling
+is refused outright — nothing would be legal. Students see the active limits
+beside the book and as dashed lines on the chart.
 
 ## The instructor's control cards
 
@@ -121,14 +123,34 @@ is set, and a read on whether each price control would actually bite — binding
 inside the band and possibly binding, or slack. It's populated **before** the
 market opens.
 
-**Trading.** Only producers post offers, and **only one offer stands at a time —
-the best one**. A new offer must strictly undercut the standing offer to take
-the book; the producer who is displaced is told who undercut them and at what
-price. **Prices are whole dollars only** — enforced on the host, not just in the
-input. Consumers do not post bids: they accept the standing offer. A purchase
-executes at the offer price, matches the seller's cheapest unsold unit against
-the buyer's highest unbought unit, and **clears the book** — the chart starts a
-new column and any price may open it again.
+**Trading — a two-sided book.** Producers post **sell offers** and consumers post
+**buy offers**, into the same book. Each side keeps **only its best order
+resting**: a new sell offer must strictly undercut the standing one, a new buy
+offer must strictly beat it. Whoever is displaced is told who beat them and at
+what price. **Prices are whole dollars only** — enforced on the host, not just in
+the input.
+
+**The two ways a trade happens** are the same event seen from either end:
+
+1. **Accepting.** One click on *Buy Tin at $16* or *Sell Tin at $9* takes
+   whatever is resting on the other side. Nobody has to type a number to say
+   yes, which is what keeps a 20-person round moving.
+2. **Crossing.** A posted price that meets the other side doesn't rest — it
+   trades on the spot. A sell offer at or below the standing bid, or a buy offer
+   at or above the standing ask, executes immediately.
+
+Either way the trade executes at the **resting order's price**, not the
+incoming one. Whoever committed to a number first sets the terms — so posting is
+worth doing, rather than everyone waiting to accept. A buy offer of $18 that
+crosses a resting $14 ask trades at **$14**, and the buyer keeps the difference.
+
+Because any crossing pair trades at once, a resting bid is always strictly below
+a resting ask; the spread is visible on both dashboards as the gap between the
+two numbers. A trade **clears the whole book** — the chart starts a new column
+and any price may open it again from either direction. An order still resting on
+the far side is cancelled rather than executed, and its owner is told so.
+Execution matches the seller's cheapest unsold unit against the buyer's highest
+unbought unit, exactly as before.
 
 **Profit.** Producer profit is `price − cost`; consumer surplus is
 `value − price`. Both are computed per unit, totalled per round, and banked into
@@ -148,14 +170,18 @@ efficiency, with the competitive-equilibrium quantity and price band computed
 from the aggregate schedules. That's the number the discussion after the round
 is usually about. Students are not told it — see *Efficiency*.
 
-## The offer chart
+## The order chart
 
-Both dashboards render the same chart: **one column per trade**. Every sell
-offer posted in the run-up to a purchase is a dot in that trade's column,
-stacked by price — since each offer must undercut the last, a column reads
-top-to-bottom as the bidding came down. The orange dot at the foot of a column
-is the offer that actually traded. The rightmost column is the trade in
-progress.
+Both dashboards render the same chart: **one column per trade**, now carrying
+**both ladders**. Every order posted in the run-up to a trade is a dot in that
+column: sell offers in blue walking *down*, buy offers in orange walking *up*,
+since each must improve on the last. A column therefore reads as the two sides
+closing on each other, and the dark dot is where they finally met — drawn in ink
+at the execution price, the same marker the S&D chart uses for the crossing,
+because that is what it is. The rightmost column is the trade in progress.
+
+Blue is the sell side and orange the buy side on **both** charts, so supply
+keeps the colour it wears on the S&D curves.
 
 **The box is a fixed size** and columns are deliberately narrow. Adding rounds,
 switching to the all-rounds view or flipping to the table never resizes the
@@ -214,9 +240,10 @@ schedules — neither did Hayek's planner.
 
 **What's deliberately not built:** a production chain (manufacturers buying an
 input and selling a finished good), which is the most vivid version of the tin
-story and a much larger change. Also note the one-standing-offer rule means one
-person acts at a time; with two goods there are two books, but a class of 20 may
-still want a fuller order book for this particular round.
+story and a much larger change. Note also that only the **best** order rests per
+side, so a class of 20 may still want more depth than one bid and one ask —
+though with both sides now posting, twice as many people are acting at once as
+before.
 
 ## Supply & demand (instructor only)
 
@@ -304,7 +331,7 @@ backstop, not the replacement.
 
 **Student.** The name is the rejoin token: type the **same name** and you land
 back in your seat with your role, schedule, units already traded and running
-total intact — and any standing offer you'd posted still belongs to you. Names
+total intact — and any order you'd left resting still belongs to you. Names
 are matched case- and whitespace-insensitively, which does mean two students
 typing the same name share one seat. Tell the class to pick distinct names.
 
@@ -371,6 +398,28 @@ charged the buyer and seller **nothing**, recorded −$36 against the seller's
 exactly. At close, the seller's total rose by their full +$7 gain while a
 bystander who traded nothing fell $2.
 
+The double auction was driven through the real host rules, on deterministic
+schedules, not through the preview script. Both sides rest and both improvement
+rules bite (a bid of 9 refused under a resting 10, a 12 accepted; an ask of 16
+refused under a resting 15). A resting ask and bid coexist without touching
+(ask 15 over bid 12). **Crossing pays the resting price in both directions**: an
+ask of 11 into a bid of 12 traded at **12**, and a bid of 18 into an ask of 14
+traded at **14**. Both one-click accepts execute, and the stale-`seq` guard
+still refuses a click on an order that was replaced mid-click.
+
+Price controls refuse on both sides and withdraw resting orders on both sides.
+Crossing into a counterparty who has since spent their capacity withdraws that
+order instead of trading. With two goods the books are independent (a copper
+cross left the tin bid untouched) and capacity stays shared — a consumer was
+capped at 4 units across both. The externality ledger balances identically
+through all three execution paths: 8 bystanders debited $1 each, the two traders
+charged nothing and each shown −$8 caused.
+
+One bug surfaced and was fixed: the order that *executed* was being relabelled
+`cleared` by the book-clearing pass that runs behind it, so the chart called a
+completed trade a cancellation. The consumed side now comes off the book as it
+executes; only genuinely cancelled survivors read `cleared`.
+
 The stale-presence sweep was exercised against the real clock: a student silent
 for 15 seconds stayed connected, 17 seconds flipped them to dropped and logged
 it once, a second sweep reported no change (so it can't re-broadcast every
@@ -428,11 +477,14 @@ when the offer chart or the S&D crossing is the only thing on the projector.
 
 ## Known gaps
 
-- **Offers below cost / purchases above value are allowed.** The hint text warns
-  ("buying at $12 loses $3") but nothing blocks a losing trade — deliberate, so
-  the mistake is discussable, but flip it if your class needs guardrails.
-- **No offer expiry.** The standing offer lives until it is undercut, bought, or
-  the market closes.
+- **Losing trades are allowed** — selling below cost, buying above value.
+  Deliberate, so the mistake is discussable, but flip it if your class needs
+  guardrails. Students read their own schedule to see what a price is worth to
+  them; the app doesn't warn them.
+- **Only the best order rests per side.** There is no depth behind it, so a
+  second-best bid is beaten rather than queued.
+- **No order expiry.** A resting order lives until it is beaten, taken, cleared
+  by a trade, or the market closes.
 - **Re-rolling schedules mid-round discards that round's offers** without
   archiving them — a re-roll is a restart, not a new round.
 - Per-student round history is recorded but not yet plotted; the all-rounds

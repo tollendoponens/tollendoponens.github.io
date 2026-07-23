@@ -60,20 +60,27 @@ function setChartRound(id, value) {
   chartRound[id] = value === "current" || value === "all" ? value : Number(value);
 }
 
-/** Group one round's event stream into one column per trade, plus the open one. */
+/* Rounds archived before the book was two-sided carry neither a side nor a
+ * byName. They read as sell offers, which is what they were. */
+function orderSide(e) { return e.side || "sell"; }
+function orderWho(e) { return e.byName || e.sellerName || "—"; }
+
+/** Group one round's event stream into one column per trade, plus the open one.
+ *  Each column holds both ladders: asks walking down, bids walking up. */
 function buildColumns(events) {
   const cols = [];
-  let cur = { offers: [], trade: null };
+  const fresh = () => ({ asks: [], bids: [], trade: null });
+  let cur = fresh();
   events.forEach((e) => {
     if (e.kind === "offer") {
-      cur.offers.push(e);
+      (orderSide(e) === "buy" ? cur.bids : cur.asks).push(e);
     } else {
       cur.trade = e;
       cols.push(cur);
-      cur = { offers: [], trade: null };
+      cur = fresh();
     }
   });
-  if (cur.offers.length) cols.push(cur);
+  if (cur.asks.length || cur.bids.length) cols.push(cur);
   return cols;
 }
 
@@ -171,7 +178,11 @@ function renderRoundPicker(id, archive, currentRound) {
 
 function plotView(columns, el, params) {
   const prices = [];
-  columns.forEach((c) => c.offers.forEach((o) => prices.push(o.price)));
+  columns.forEach((c) => {
+    c.asks.forEach((o) => prices.push(o.price));
+    c.bids.forEach((o) => prices.push(o.price));
+    if (c.trade) prices.push(c.trade.price);
+  });
 
   // A binding price control has to be on screen even if nobody offered near it.
   const floor = numOrNull(params.priceFloor);
@@ -222,47 +233,66 @@ function plotView(columns, el, params) {
     <text x="${GEO.padL - 4}" y="${(y(c.p) - 5).toFixed(1)}" font-size="10" font-weight="700"
           fill="var(--text-dim)">${c.label}</text>`).join("");
 
+  // One ladder per side. Asks walk down and bids walk up, so a column reads as
+  // the two sides closing on each other — and the trade marker sits where they
+  // finally met. Blue is the sell side and orange the buy side, the same way
+  // round they wear on the supply and demand chart.
+  const ladder = (orders, color, cx) => (orders.length > 1
+    ? `<polyline points="${orders.map((o) => `${cx.toFixed(1)},${y(o.price).toFixed(1)}`).join(" ")}"
+         fill="none" stroke="${color}" stroke-width="2"
+         stroke-linejoin="round" stroke-linecap="round"/>`
+    : "");
+
   const body = columns.map((col, i) => {
     const cx = x(i);
-    const traded = !!col.trade;
 
-    const path = col.offers.length > 1
-      ? `<polyline points="${col.offers.map((o) => `${cx.toFixed(1)},${y(o.price).toFixed(1)}`).join(" ")}"
-           fill="none" stroke="${SERIES.offer}" stroke-width="2"
-           stroke-linejoin="round" stroke-linecap="round"/>`
-      : "";
-
-    const dots = col.offers.map((o, k) => {
-      const isTrade = traded && k === col.offers.length - 1;
-      const tip = isTrade
-        ? `Round ${col.round} · traded ${money(o.price)} · ${o.sellerName} → ${col.trade.buyerName}`
-        : `Round ${col.round} · offer ${money(o.price)} · ${o.sellerName}`
-          + (o.status === "beaten" ? " (undercut)" : "");
+    const dotsFor = (orders, color, label) => orders.map((o) => {
       const cy = y(o.price).toFixed(1);
+      const tip = `Round ${col.round} · ${label} ${money(o.price)} · ${orderWho(o)}`
+        + (o.status === "beaten" ? " (beaten)"
+          : o.status === "cleared" ? " (cleared by the trade)" : "");
       // 2px surface ring keeps overlapping dots legible; it is also the hit target.
       return `
-        <circle cx="${cx.toFixed(1)}" cy="${cy}" r="${isTrade ? 6 : 4.5}" fill="var(--bg)"/>
-        <circle cx="${cx.toFixed(1)}" cy="${cy}" r="${isTrade ? 4.5 : 3}"
-                fill="${isTrade ? SERIES.trade : SERIES.offer}"/>
+        <circle cx="${cx.toFixed(1)}" cy="${cy}" r="4.5" fill="var(--bg)"/>
+        <circle cx="${cx.toFixed(1)}" cy="${cy}" r="3" fill="${color}"/>
         <circle cx="${cx.toFixed(1)}" cy="${cy}" r="10" fill="transparent"
                 data-tip="${esc(tip)}" style="cursor:pointer"/>`;
     }).join("");
 
+    // The execution, in ink — the same marker the S&D chart uses for the
+    // crossing, because that is what it is.
+    const t = col.trade;
+    const tradeMark = !t ? "" : (() => {
+      const cy = y(t.price).toFixed(1);
+      const tip = `Round ${col.round} · traded ${money(t.price)} · ${t.sellerName} → ${t.buyerName}`;
+      return `
+        <circle cx="${cx.toFixed(1)}" cy="${cy}" r="6.5" fill="var(--bg)"/>
+        <circle cx="${cx.toFixed(1)}" cy="${cy}" r="4.5" fill="var(--text)"/>
+        <circle cx="${cx.toFixed(1)}" cy="${cy}" r="11" fill="transparent"
+                data-tip="${esc(tip)}" style="cursor:pointer"/>`;
+    })();
+
     // No direct labels: the y-axis, the hover tip and the table carry values.
-    return path + dots;
+    return ladder(col.asks, SERIES.offer, cx) + ladder(col.bids, SERIES.trade, cx)
+      + dotsFor(col.asks, SERIES.offer, "sell offer")
+      + dotsFor(col.bids, SERIES.trade, "buy offer")
+      + tradeMark;
   }).join("");
 
   const trades = columns.filter((c) => c.trade).length;
+  const asks = columns.reduce((n, c) => n + c.asks.length, 0);
+  const bids = columns.reduce((n, c) => n + c.bids.length, 0);
   const rounds = [...new Set(columns.map((c) => c.round))];
   const summary = `${columns.length} columns, one per trade`
     + (rounds.length > 1 ? `, across rounds ${rounds[0]} to ${rounds[rounds.length - 1]}` : "")
-    + `: ${prices.length} sell offers, ${trades} trades, `
+    + `: ${asks} sell offers, ${bids} buy offers, ${trades} trades, `
     + `prices ${money(Math.min(...prices))} to ${money(Math.max(...prices))}.`;
 
   return `
     <div class="chart-legend">
       <span class="legend-item"><span class="dot" style="background:${SERIES.offer}"></span>Sell offer</span>
-      <span class="legend-item"><span class="dot" style="background:${SERIES.trade}"></span>Offer that traded</span>
+      <span class="legend-item"><span class="dot" style="background:${SERIES.trade}"></span>Buy offer</span>
+      <span class="legend-item"><span class="dot" style="background:var(--text)"></span>Trade</span>
       ${rounds.length > 1 ? '<span class="legend-item"><span class="legend-dash"></span>Round divider</span>' : ""}
     </div>
     <div class="chart-scroll">
@@ -465,17 +495,20 @@ function tableView(columns) {
   const rows = columns.map((col) => {
     seen[col.round] = (seen[col.round] || 0) + (col.trade ? 1 : 0);
     const label = col.trade ? `Trade ${seen[col.round]}` : "Open";
-    return col.offers.map((o, k) => {
-      const isTrade = col.trade && k === col.offers.length - 1;
-      return `
-        <tr>
-          ${multiRound ? `<td class="num">${col.round}</td>` : ""}
-          <td>${label}</td>
-          <td>${isTrade ? "Traded" : "Offer"}</td>
-          <td class="num">${money(o.price)}</td>
-          <td>${esc(isTrade ? `${o.sellerName} → ${col.trade.buyerName}` : o.sellerName)}</td>
-        </tr>`;
-    }).join("");
+    const row = (event, price, who) => `
+      <tr>
+        ${multiRound ? `<td class="num">${col.round}</td>` : ""}
+        <td>${label}</td>
+        <td>${event}</td>
+        <td class="num">${money(price)}</td>
+        <td>${esc(who)}</td>
+      </tr>`;
+    // Both ladders in the order they were posted, then the execution.
+    const orders = col.asks.concat(col.bids).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    return orders.map((o) =>
+      row(orderSide(o) === "buy" ? "Buy offer" : "Sell offer", o.price, orderWho(o))).join("")
+      + (col.trade ? row("Traded", col.trade.price,
+          `${col.trade.sellerName} → ${col.trade.buyerName}`) : "");
   }).join("");
   return `
     <div class="table-scroll">

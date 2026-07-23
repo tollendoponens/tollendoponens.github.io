@@ -91,9 +91,13 @@ function newSessionState(code) {
   };
 }
 
+/** One book per good, two-sided: the best sell offer and the best buy offer
+ *  rest against each other. The invariant everywhere below is that a resting
+ *  bid is always strictly under a resting ask — the moment they touch, they
+ *  trade and the book clears. */
 function newMarket(goods) {
   const books = {};
-  goods.forEach((g) => { books[g] = { ask: null, events: [], seq: 0 }; });
+  goods.forEach((g) => { books[g] = { ask: null, bid: null, events: [], seq: 0 }; });
   return { books, trades: [] };
 }
 
@@ -148,7 +152,8 @@ function reseat(state, student, newId) {
 
   eachBook(state, (book) => {
     if (book.ask && book.ask.sellerId === oldId) book.ask.sellerId = newId;
-    book.events.forEach((e) => { if (e.sellerId === oldId) e.sellerId = newId; });
+    if (book.bid && book.bid.buyerId === oldId) book.bid.buyerId = newId;
+    book.events.forEach((e) => { if (e.byId === oldId) e.byId = newId; });
   });
   state.market.trades.forEach((t) => {
     if (t.sellerId === oldId) t.sellerId = newId;
@@ -483,10 +488,13 @@ function money(n) {
 
 /* ---------- the slice a student may see ---------- */
 
+/** Orders are public — who posted, at what price, on which side. Only the
+ *  poster's peer id is stripped. Private values never appear here at all. */
 function publicEvents(events) {
   return events.map((e) => e.kind === "trade"
     ? { kind: "trade", price: e.price, sellerName: e.sellerName, buyerName: e.buyerName, ts: e.ts }
-    : { kind: "offer", price: e.price, sellerName: e.sellerName, ts: e.ts, status: e.status });
+    : { kind: "offer", side: e.side || "sell", price: e.price, byName: e.byName,
+        ts: e.ts, status: e.status });
 }
 
 function publicBooks(market) {
@@ -494,6 +502,7 @@ function publicBooks(market) {
   Object.keys(market.books).forEach((g) => {
     out[g] = {
       ask: market.books[g].ask,
+      bid: market.books[g].bid,
       seq: market.books[g].seq,
       events: publicEvents(market.books[g].events),
     };

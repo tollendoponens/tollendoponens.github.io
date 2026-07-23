@@ -275,7 +275,7 @@ const UI = {
       ? `${formatClock(secondsLeft(view))} left`
       : "waiting for the instructor";
 
-    $("s-market-title").textContent = goods.length > 1 ? "Current sell offers" : "Current sell offer";
+    $("s-market-title").textContent = goods.length > 1 ? "The order books" : "The order book";
 
     /* price controls, if any */
     const { priceFloor, priceCeiling } = view.params;
@@ -424,55 +424,62 @@ function marketShell(view, good, isProducer, showName) {
         The two people in the trade pay nothing — including you, when it's yours.</span>
     </div>`;
 
-  const action = isProducer
-    ? `<div style="display:flex;gap:10px;align-items:flex-end;margin-top:10px;">
-         <div class="field" style="flex:1;">
-           <label for="s-offer-${good}">Asking price (whole dollars)</label>
-           <input class="input" id="s-offer-${good}" type="number" step="1" min="1" placeholder="0">
-         </div>
-         <button class="btn btn-primary" id="s-act-${good}" data-offer-good="${good}">Post</button>
-       </div>`
-    : `<button class="btn btn-primary btn-block" style="margin-top:10px;"
-               id="s-act-${good}" data-buy-good="${good}">Buy</button>`;
-
+  // Both roles get the same two controls: name your own price, or take the
+  // price already sitting there. The second is what keeps a fast round moving —
+  // nobody should have to type a number just to say yes.
   return `<div class="market-block">
-    <div class="ask-box">
-      <div>
-        ${showName ? `<div class="card-kicker">${goodName(good)}</div>` : ""}
-        <div class="ask-price" id="s-ask-${good}">—</div>
-        <div class="ask-meta" id="s-askmeta-${good}">no offer on the book</div>
+    ${showName ? `<div class="card-kicker">${goodName(good)}</div>` : ""}
+    <div class="book">
+      <div class="book-side">
+        <div class="book-label">Best buy offer</div>
+        <div class="book-price" id="s-bid-${good}">—</div>
+        <div class="book-meta" id="s-bidmeta-${good}">nobody is bidding</div>
+      </div>
+      <div class="book-side">
+        <div class="book-label">Best sell offer</div>
+        <div class="book-price" id="s-ask-${good}">—</div>
+        <div class="book-meta" id="s-askmeta-${good}">nobody is offering</div>
       </div>
     </div>${spill}
-    ${action}
+    <div class="order-row">
+      <div class="field" style="flex:1;">
+        <label for="s-offer-${good}">${isProducer ? "Sell at" : "Buy at"} (whole dollars)</label>
+        <input class="input" id="s-offer-${good}" type="number" step="1" min="1" placeholder="0">
+      </div>
+      <button class="btn btn-secondary" id="s-post-${good}" data-post-good="${good}">
+        Post ${isProducer ? "sell" : "buy"} offer</button>
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:8px;"
+            id="s-take-${good}" data-take-good="${good}">—</button>
   </div>`;
 }
 
 /** Everything volatile, written in place. Touches no input's value. */
 function updateMarketBlock(view, me, good, isProducer, capacityLeftNow) {
   const book = view.market.books[good] || {};
-  const ask = book.ask;
+  const { ask, bid } = book;
   const units = (me.units && me.units[good]) || [];
   const next = units.find((u) => u.price === null);
   const spent = capacityLeftNow <= 0;
 
-  const price = $(`s-ask-${good}`);
-  if (!price) return;
-  setText(price, ask ? money(ask.price) : "—");
-  setText($(`s-askmeta-${good}`), ask ? `posted by ${ask.sellerName}` : "no offer on the book");
+  const askEl = $(`s-ask-${good}`);
+  if (!askEl) return;
+  setText(askEl, ask ? money(ask.price) : "—");
+  setText($(`s-askmeta-${good}`), ask ? `from ${ask.sellerName}` : "nobody is offering");
+  setText($(`s-bid-${good}`), bid ? money(bid.price) : "—");
+  setText($(`s-bidmeta-${good}`), bid ? `from ${bid.buyerName}` : "nobody is bidding");
 
-  const btn = $(`s-act-${good}`);
-  const input = $(`s-offer-${good}`);
+  // You post against your own side and accept from the other one.
+  const resting = isProducer ? bid : ask;
+  const out = spent || !next;
+  setDisabled($(`s-post-${good}`), out);
+  setDisabled($(`s-offer-${good}`), out);
 
-  if (isProducer) {
-    const blocked = spent || !next;
-    setDisabled(btn, blocked);
-    setDisabled(input, blocked);
-    return;
-  }
-
-  const blocked = spent || !next || !ask;
-  setDisabled(btn, blocked);
-  setText(btn, ask ? `Buy ${goodName(good)} at ${money(ask.price)}` : "No offer to buy");
+  const take = $(`s-take-${good}`);
+  setDisabled(take, out || !resting);
+  setText(take, resting
+    ? `${isProducer ? "Sell" : "Buy"} ${goodName(good)} at ${money(resting.price)}`
+    : `No ${isProducer ? "buy" : "sell"} offer to take`);
 }
 
 /* Write only on change — a needless assignment can still disturb the caret. */

@@ -276,21 +276,55 @@ body {
 
 /* ================= MARKET ================= */
 
-/* The standing sell offer — the number both roles are watching. */
-.ask-box {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+/* The two-sided book — the best bid and the best ask, side by side. Both
+   numbers are what the whole room is watching, so they get equal weight and
+   the gap between them reads as the spread. */
+.book {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
   margin-top: 6px;
 }
-.ask-price {
-  font-size: 44px;
+.book-side {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  min-width: 0;
+}
+.book-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.book-price {
+  font-size: 34px;
   font-weight: 700;
   letter-spacing: -0.03em;
-  line-height: 1.05;
+  line-height: 1.1;
+  margin-top: 2px;
 }
-.ask-meta { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
-.ask-box .tag { margin-left: auto; }
+.book-meta {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Type your own price, or take the one that's there. */
+.order-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  margin-top: 12px;
+}
+@media (max-width: 560px) {
+  .book { grid-template-columns: 1fr; }
+  .order-row { flex-wrap: wrap; }
+}
 .controls-row {
   display: flex;
   align-items: center;
