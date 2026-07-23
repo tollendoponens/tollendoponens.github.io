@@ -276,9 +276,6 @@ const UI = {
       : "waiting for the instructor";
 
     $("s-market-title").textContent = goods.length > 1 ? "Current sell offers" : "Current sell offer";
-    $("s-capacity").textContent = dealt
-      ? `${left} of ${view.params.unitsPerPlayer} units left`
-      : "—";
 
     /* price controls, if any */
     const { priceFloor, priceCeiling } = view.params;
@@ -447,7 +444,6 @@ function marketShell(view, good, isProducer, showName) {
       </div>
     </div>${spill}
     ${action}
-    <p class="card-note" id="s-hint-${good}"></p>
   </div>`;
 }
 
@@ -457,7 +453,6 @@ function updateMarketBlock(view, me, good, isProducer, capacityLeftNow) {
   const ask = book.ask;
   const units = (me.units && me.units[good]) || [];
   const next = units.find((u) => u.price === null);
-  const { priceFloor, priceCeiling } = view.params;
   const spent = capacityLeftNow <= 0;
 
   const price = $(`s-ask-${good}`);
@@ -467,41 +462,21 @@ function updateMarketBlock(view, me, good, isProducer, capacityLeftNow) {
 
   const btn = $(`s-act-${good}`);
   const input = $(`s-offer-${good}`);
-  const hint = $(`s-hint-${good}`);
 
   if (isProducer) {
-    const mustBeat = ask ? ask.price - 1 : (priceCeiling != null ? priceCeiling : null);
     const blocked = spent || !next;
     setDisabled(btn, blocked);
     setDisabled(input, blocked);
-    setHTML(hint, blocked
-      ? (spent ? "You've used your whole capacity this round."
-               : `No ${goodName(good).toLowerCase()} units left.`)
-      : `Your next ${goodName(good).toLowerCase()} unit costs <strong>${money(next.value)}</strong>. `
-        + (ask === null
-          ? (mustBeat === null
-            ? "The book is empty — any whole-dollar price opens it."
-            : `The book is empty — anything up to <strong>${money(mustBeat)}</strong> opens it.`)
-          : `To take the book you must offer <strong>${money(mustBeat)}</strong> or less`)
-        + (priceFloor != null ? `, and no lower than <strong>${money(priceFloor)}</strong>.` : "."));
     return;
   }
 
   const blocked = spent || !next || !ask;
   setDisabled(btn, blocked);
   setText(btn, ask ? `Buy ${goodName(good)} at ${money(ask.price)}` : "No offer to buy");
-  setHTML(hint, spent
-    ? "You've spent your whole capacity this round."
-    : !next ? `No ${goodName(good).toLowerCase()} units left to buy.`
-    : !ask ? "Wait for a producer to post an offer."
-    : `Your next ${goodName(good).toLowerCase()} unit is worth <strong>${money(next.value)}</strong> to you — `
-      + `buying at ${money(ask.price)} ${next.value - ask.price >= 0 ? "gains" : "loses"} `
-      + `<strong>${money(Math.abs(next.value - ask.price))}</strong>.`);
 }
 
 /* Write only on change — a needless assignment can still disturb the caret. */
 function setText(el, s) { if (el && el.textContent !== s) el.textContent = s; }
-function setHTML(el, s) { if (el && el.innerHTML !== s) el.innerHTML = s; }
 function setDisabled(el, v) { if (el && el.disabled !== v) el.disabled = v; }
 
 /* ---------------- small helpers ---------------- */
