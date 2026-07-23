@@ -445,7 +445,6 @@ function marketShell(view, good, isProducer, showName) {
         <div class="ask-price" id="s-ask-${good}">—</div>
         <div class="ask-meta" id="s-askmeta-${good}">no offer on the book</div>
       </div>
-      <span class="tag tag-outline" id="s-asktag-${good}">book empty</span>
     </div>${spill}
     ${action}
     <p class="card-note" id="s-hint-${good}"></p>
@@ -465,9 +464,6 @@ function updateMarketBlock(view, me, good, isProducer, capacityLeftNow) {
   if (!price) return;
   setText(price, ask ? money(ask.price) : "—");
   setText($(`s-askmeta-${good}`), ask ? `posted by ${ask.sellerName}` : "no offer on the book");
-  const tag = $(`s-asktag-${good}`);
-  setText(tag, ask ? "best offer" : "book empty");
-  tag.className = `tag ${ask ? "tag-accent" : "tag-outline"}`;
 
   const btn = $(`s-act-${good}`);
   const input = $(`s-offer-${good}`);
