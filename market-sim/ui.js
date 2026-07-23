@@ -99,7 +99,6 @@ const UI = {
     $("t-btn-pause").textContent = state.phase === PHASE.PAUSED ? "Unfreeze market" : "Freeze market";
     $("t-btn-pause").disabled = state.phase !== PHASE.OPEN && state.phase !== PHASE.PAUSED;
 
-    UI.renderBriefing(state, ce);
     UI.renderRoster(state);
     UI.renderTrades(state);
     UI.renderFeed(state.log, $("t-feed"), $("t-feed-empty"));
@@ -180,31 +179,6 @@ const UI = {
       ? `${shocks.length} shock${shocks.length === 1 ? "" : "s"} applied`
       : "no shocks yet";
     $("t-shock-tag").className = `tag ${shocks.length ? "tag-warn" : "tag-outline"}`;
-  },
-
-  /** What the dealt schedules imply — the numbers you set price controls against. */
-  renderBriefing(state, ce) {
-    const dealt = hasSchedules(state);
-    const p = state.params;
-    $("t-brief-phase").textContent = dealt
-      ? (state.phase === PHASE.READY ? "dealt · market closed" : `round ${state.round}`)
-      : "schedules not dealt";
-    $("t-brief-band").textContent = ce.priceLo == null
-      ? "—"
-      : (ce.priceLo === ce.priceHi ? money(ce.priceLo) : `${money(ce.priceLo)}–${money(ce.priceHi)}`);
-    $("t-brief-qty").textContent = ce.quantity || "—";
-    $("t-brief-surplus").textContent = ce.maxSurplus ? money(ce.maxSurplus) : "—";
-
-    // The social optimum only appears once a spillover is actually set.
-    const ext = anyExternality(state);
-    $("t-brief-social-cell").hidden = !ext || !dealt;
-    if (ext && dealt) {
-      const g = activeGoods(state)[0];
-      const so = socialOptimumOf(scheduleSnapshot(state, g), aggregateExternality(state, g));
-      $("t-brief-social").textContent = `q=${so.quantity}`;
-    }
-    $("t-brief-note").innerHTML = briefingNote(p, ce, dealt)
-      + (ext && dealt ? " " + externalityNote(state) : "");
   },
 
   renderRoster(state) {
@@ -352,9 +326,13 @@ const UI = {
     $("s-units-empty").textContent =
       "Your schedule is dealt just before the market opens — it'll appear here.";
     $("s-sched-title").textContent = isProducer ? "Your cost schedule" : "Your demand schedule";
-    $("s-sched-tag").textContent = goods.length > 1
-      ? `${view.params.unitsPerPlayer} units total, your choice of good`
-      : (isProducer ? "costs rise per unit" : "values fall per unit");
+    // Only worth a tag with two goods, where the shared-capacity tradeoff
+    // isn't obvious from the title alone. One good needs no caption — the
+    // title and the rows themselves already say what's rising or falling.
+    $("s-sched-tag").hidden = goods.length <= 1;
+    if (goods.length > 1) {
+      $("s-sched-tag").textContent = `${view.params.unitsPerPlayer} units total, your choice of good`;
+    }
 
     if (!dealt) { $("s-schedules").innerHTML = ""; $("s-summary").innerHTML = ""; return; }
 
@@ -557,45 +535,6 @@ function roleTag(role) {
   return role === ROLE.PRODUCER
     ? '<span class="tag tag-accent">Producer</span>'
     : '<span class="tag tag-neutral">Consumer</span>';
-}
-
-/** Says which way the spillover pushes and by how much. */
-function externalityNote(state) {
-  const others = bystanderCount(state);
-  return activeGoods(state).filter((g) => externalityOf(state, g) !== 0).map((g) => {
-    const e = externalityOf(state, g);
-    const agg = aggregateExternality(state, g);
-    const ce = equilibrium(state, g).quantity;
-    const so = socialOptimumOf(scheduleSnapshot(state, g), agg).quantity;
-    const dir = so < ce ? "over-trade" : so > ce ? "under-trade" : "trade about right";
-    return `<strong>${goodName(g)}</strong>: ${money(Math.abs(e))}/unit `
-      + `${e < 0 ? "off" : "to"} each of ${others} bystanders = `
-      + `<strong>${signedPlain(agg)}</strong> per unit socially — `
-      + `private q=${ce} vs social q=${so}, so the market will ${dir}.`;
-  }).join(" ");
-}
-
-/** Tells the instructor whether a control would actually bite. */
-function briefingNote(p, ce, dealt) {
-  if (!dealt) return "Deal the schedules to see where this round's equilibrium sits.";
-  if (ce.priceLo == null) return "No profitable trades exist in these schedules.";
-  const bits = [];
-  if (p.priceCeiling != null) {
-    bits.push(p.priceCeiling < ce.priceLo
-      ? `Ceiling ${money(p.priceCeiling)} is <strong>binding</strong> — below the CE band, expect shortage.`
-      : p.priceCeiling <= ce.priceHi
-        ? `Ceiling ${money(p.priceCeiling)} sits inside the CE band — it may bind.`
-        : `Ceiling ${money(p.priceCeiling)} is above the band — not binding.`);
-  }
-  if (p.priceFloor != null) {
-    bits.push(p.priceFloor > ce.priceHi
-      ? `Floor ${money(p.priceFloor)} is <strong>binding</strong> — above the CE band, expect surplus.`
-      : p.priceFloor >= ce.priceLo
-        ? `Floor ${money(p.priceFloor)} sits inside the CE band — it may bind.`
-        : `Floor ${money(p.priceFloor)} is below the band — not binding.`);
-  }
-  if (!bits.length) return "No price controls set. A binding one sits outside the CE band.";
-  return bits.join(" ");
 }
 
 function phaseLabel(phase) {

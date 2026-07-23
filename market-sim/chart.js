@@ -123,7 +123,7 @@ function renderOfferChart(id, opts) {
     const selection = chartRound[id] || "current";
     el.innerHTML = `<div class="mount">${
       selection === "current" || selection === "all"
-        ? `No ${goodName(good).toLowerCase()} offers yet.<br>The chart fills in as producers post.`
+        ? `No ${goodName(good).toLowerCase()} offers yet.`
         : `Round ${selection} had no ${goodName(good).toLowerCase()} offers.`
     }</div>`;
     return;

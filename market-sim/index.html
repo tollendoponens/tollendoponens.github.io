@@ -125,25 +125,6 @@
             <span class="tag tag-outline" style="margin-left:auto;" id="t-shock-tag">no shocks yet</span>
           </div>
 
-          <!-- Pre-market briefing: what the dealt schedules imply, so controls
-               can be set against a known equilibrium before trading starts. -->
-          <div class="briefing" id="t-briefing">
-            <div class="briefing-head">
-              <span class="card-kicker" style="margin:0;">Before you open</span>
-              <span class="tag tag-outline" id="t-brief-phase">schedules not dealt</span>
-            </div>
-            <div class="briefing-grid">
-              <div><span class="briefing-label">CE price band</span><span class="briefing-value" id="t-brief-band">—</span></div>
-              <div><span class="briefing-label">CE quantity</span><span class="briefing-value" id="t-brief-qty">—</span></div>
-              <div><span class="briefing-label">Max surplus</span><span class="briefing-value" id="t-brief-surplus">—</span></div>
-              <div id="t-brief-social-cell" hidden>
-                <span class="briefing-label">Social optimum</span>
-                <span class="briefing-value" id="t-brief-social">—</span>
-              </div>
-            </div>
-            <p class="card-note" id="t-brief-note"></p>
-          </div>
-
           <div class="ctl-section">
             <div class="ctl-label">Price controls</div>
             <div class="ctl-inline">
@@ -157,17 +138,12 @@
               </div>
               <button class="btn btn-secondary" id="t-btn-controls">Apply controls</button>
             </div>
-            <p class="card-note">Blank means no limit. Takes effect immediately.</p>
           </div>
 
           <div class="ctl-section">
             <div class="ctl-label">Shock</div>
             <div class="ctl-inline">
               <button class="btn btn-secondary" id="t-btn-shock">Supply shock…</button>
-              <p class="card-note" style="margin:0;flex:1;min-width:180px;">
-                Raises costs for some producers. Silent by default — the price
-                moves and nobody is told why.
-              </p>
             </div>
           </div>
         </div>
