@@ -97,11 +97,30 @@ function newMarket(goods) {
   return { books, trades: [] };
 }
 
+/* A killed browser tab often never fires a WebRTC close event, so presence is
+ * judged on the heartbeat instead: three missed PINGs and you are gone. */
+const STALE_MS = 16000;
+
+/** Mark anyone who has stopped heartbeating. Returns true if anything changed,
+ *  so the caller only re-broadcasts when presence actually moved. */
+function sweepStale(state) {
+  const cutoff = Date.now() - STALE_MS;
+  let changed = false;
+  studentList(state).forEach((s) => {
+    if (s.connected && (s.lastSeen || 0) < cutoff) {
+      s.connected = false;
+      pushLog(state, `${s.name} dropped out of contact`);
+      changed = true;
+    }
+  });
+  return changed;
+}
+
 function newStudent(id, name, role) {
   return {
     id, name, role,
     connected: true,
-    lastSeen: Date.now(),
+    lastSeen: Date.now(),   // refreshed by the PING heartbeat
     units: {},              // good -> [{ n, value, price }]
     borne: 0,               // $ charged to them this round by OTHER people's
                             // trades. Real money — it lands in their round net.
@@ -344,18 +363,6 @@ function roundNet(student) {
   return roundProfit(student) + (student.borne || 0);
 }
 
-function socialSurplus(state) {
-  return realizedSurplus(state) + externalTotal(state);
-}
-
-/** Realized social surplus as a share of the best society could have done. */
-function socialEfficiency(state) {
-  const max = activeGoods(state).reduce((sum, g) =>
-    sum + socialOptimumOf(scheduleSnapshot(state, g), aggregateExternality(state, g)).maxSurplus, 0);
-  if (!max) return null;
-  return socialSurplus(state) / max;
-}
-
 function anyExternality(state) {
   return activeGoods(state).some((g) => externalityOf(state, g) !== 0);
 }
@@ -364,14 +371,78 @@ function tradesOf(state, good) {
   return good ? state.market.trades.filter((t) => t.good === good) : state.market.trades;
 }
 
-function realizedSurplus(state) {
-  return state.market.trades.reduce((sum, t) => sum + (t.value - t.cost), 0);
+/* ---------- efficiency ----------
+ * ONE measure, always on the social basis: realized surplus including the
+ * spillover, over the most society could have got. With no externality set the
+ * aggregate spillover is 0, socialOptimumOf falls through to the private
+ * equilibrium, and this is exactly the old private number — so there is no
+ * second metric and no label that changes underfoot.
+ *
+ * Measuring on the private basis was the bug: a market that trades every
+ * privately profitable unit scores 100% no matter how much damage those trades
+ * do to everyone else, which is the one thing the externality lesson needs the
+ * scoreboard to show.
+ */
+
+/** Score one good: realized social surplus, and the most society could have
+ *  had. `aggExt` is the spillover per unit summed over the bystanders it
+ *  actually lands on. Null when there is no market to score. */
+function scoreGood(schedule, trades, aggExt) {
+  if (!schedule || !schedule.costs.length || !schedule.values.length) return null;
+  return {
+    surplus: trades.reduce((sum, t) => sum + (t.value - t.cost) + aggExt, 0),
+    max: socialOptimumOf(schedule, aggExt).maxSurplus,
+  };
 }
 
+function addScore(a, b) {
+  if (!b) return a;
+  return a ? { surplus: a.surplus + b.surplus, max: a.max + b.max } : b;
+}
+
+/** A score as a ratio. A big enough external cost makes no unit worth trading;
+ *  then nothing is the whole of what was available, and trading nothing is
+ *  efficient while trading anything is not. */
+function ratioOf(score) {
+  if (!score) return null;
+  if (score.max <= 0) return score.surplus >= 0 ? 1 : 0;
+  return score.surplus / score.max;
+}
+
+/** Realized and maximum surplus across every good in play. */
+function surplusScore(state) {
+  return activeGoods(state).reduce((acc, g) => addScore(acc,
+    scoreGood(scheduleSnapshot(state, g), tradesOf(state, g), aggregateExternality(state, g))), null);
+}
+
+/** The header tile's number. */
 function efficiency(state) {
-  const max = activeGoods(state).reduce((sum, g) => sum + equilibrium(state, g).maxSurplus, 0);
-  if (!max) return null;
-  return realizedSurplus(state) / max;
+  return ratioOf(surplusScore(state));
+}
+
+/** The aggregate spillover an archived round was actually played under.
+ *  Rounds saved before this was recorded report 0 rather than back-dating
+ *  today's setting onto them — the same rule the S&D chart uses for controls. */
+function archivedAggExt(record, good) {
+  return (Number((record.externality || {})[good]) || 0) * (record.bystanders || 0);
+}
+
+/** Score an archived round against the schedules as they were dealt. Pass a
+ *  good to score just that book, which is what the per-good S&D chart wants. */
+function roundScore(record, good) {
+  const goods = good ? [good] : Object.keys(record.schedules || {});
+  return goods.reduce((acc, g) => addScore(acc, scoreGood(
+    (record.schedules || {})[g],
+    (record.trades || []).filter((t) => t.good === g),
+    archivedAggExt(record, g))), null);
+}
+
+/** Efficiency for display. Floored at 0%: a market that destroyed value
+ *  captured none of the gains available, and the raw ratio's magnitude is
+ *  unstable when the social optimum sits near zero. The dollar figures beside
+ *  it carry how far past zero it actually went. */
+function efficiencyPct(x) {
+  return x == null ? "—" : `${Math.max(0, Math.round(x * 100))}%`;
 }
 
 function avgTradePrice(state, good) {
@@ -475,6 +546,10 @@ function archiveRound(state) {
     books: state.market.books,
     trades: state.market.trades,
     schedules,
+    // Scored later against the spillover this round was actually played under,
+    // not whatever the instructor sets next.
+    externality: { ...(state.params.externality || {}) },
+    bystanders: bystanderCount(state),
     shocked: state.shocks.some((s) => s.round === state.round),
   });
   state.rounds.sort((a, b) => a.round - b.round);

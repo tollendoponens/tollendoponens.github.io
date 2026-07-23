@@ -83,16 +83,15 @@ const UI = {
     $("t-kpi-price-sub").textContent = ce.priceLo == null
       ? "CE band —"
       : `CE band ${money(ce.priceLo)}–${money(ce.priceHi)}`;
-    // With a spillover in play, private efficiency is the wrong scoreboard —
-    // switch the tile to the social one and say so.
-    const ext = anyExternality(state);
-    const shown = ext ? socialEfficiency(state) : eff;
-    $("t-kpi-eff-label").textContent = ext ? "Social efficiency" : "Efficiency";
-    $("t-kpi-eff").textContent = shown == null ? "—" : `${Math.round(shown * 100)}%`;
-    $("t-kpi-eff-sub").textContent = ext
-      ? `${money(socialSurplus(state))} incl. ${signedMoney(externalTotal(state))} spillover`
-      : (ce.maxSurplus ? `${money(realizedSurplus(state))} of ${money(ce.maxSurplus)}`
-                       : "of maximum surplus");
+    // One measure, one label. Efficiency already counts the spillover, so
+    // there's nothing to switch the tile to — only the sub-line grows a note
+    // saying how much of the total the spillover accounts for.
+    const score = surplusScore(state);
+    $("t-kpi-eff").textContent = efficiencyPct(eff);
+    $("t-kpi-eff-sub").textContent = !score
+      ? "of maximum surplus"
+      : `${money(score.surplus)} of ${money(score.max)}`
+        + (anyExternality(state) ? ` · ${signedMoney(externalTotal(state))} spillover` : "");
     $("t-roster-count").textContent = `${connectedCount(state)} connected`;
 
     $("t-btn-advance").textContent = advanceLabel(state);
@@ -149,10 +148,17 @@ const UI = {
       : scheduleSnapshot(state, sdGood);
     const shownRound = archived ? archived.round : state.round;
     const params = archived ? {} : state.params;
+    // An archived round is scored and drawn under the spillover it was played
+    // under, never today's — the rule the price controls already follow.
+    const agg = archived ? archivedAggExt(archived, sdGood)
+                         : aggregateExternality(state, sdGood);
+    const score = archived
+      ? roundScore(archived, sdGood)
+      : scoreGood(schedules, tradesOf(state, sdGood), agg);
 
     renderSDChart("t-sd", {
       schedules, params, round: shownRound, good: sdGood, dealt,
-      externality: aggregateExternality(state, sdGood),
+      externality: agg, efficiency: ratioOf(score),
     });
 
     const ce = schedules && schedules.costs.length ? equilibriumOf(schedules) : { quantity: 0 };
@@ -161,6 +167,7 @@ const UI = {
       : (archived
         ? `Round ${shownRound} as dealt — equilibrium quantity ${ce.quantity}.`
         : "This round's schedules. Price controls are drawn where you set them.")
+        + (score ? ` Efficiency ${efficiencyPct(ratioOf(score))} — ${money(score.surplus)} of ${money(score.max)}.` : "")
         + (goods.length > 1
           ? " With two goods, capacity is shared, so this is one good's curves in isolation."
           : "");
@@ -274,10 +281,18 @@ const UI = {
     const borne = me.borne || 0;
     const net = dealt ? roundProfit(me) + borne : 0;
     $("s-kpi-profit").textContent = dealt ? signedPlain(net) : "—";
+    // The round's breakdown lives here; the running game total is in the nav,
+    // where it stays visible. It used to share this slot and so vanished for
+    // the whole of any round that carried a spillover.
     $("s-kpi-profit-sub").textContent = borne
       ? `${signedPlain(roundProfit(me))} trading, ${signedPlain(borne)} from others' trades`
-      : `session total ${money(me.totalProfit || 0)}`;
+      : "this round";
     $("s-kpi-profit-sub").className = `tag ${borne < 0 ? "tag-danger" : borne > 0 ? "tag-accent" : "tag-neutral"}`;
+
+    // Banked at the end of each round, so it moves at close, not per trade.
+    const total = me.totalProfit || 0;
+    $("s-total").textContent = `Game total ${signedPlain(total)}`;
+    $("s-total").className = `tag ${total < 0 ? "tag-danger" : total > 0 ? "tag-accent" : "tag-neutral"}`;
     $("s-kpi-units-label").textContent = isProducer ? "Units sold" : "Units bought";
     $("s-kpi-units").textContent = dealt ? traded : "—";
     $("s-kpi-units-sub").textContent = `of ${view.params.unitsPerPlayer}`;

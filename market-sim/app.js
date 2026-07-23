@@ -163,7 +163,14 @@ function goLive() {
   wireHost();
   syncParamInputs();
   UI.showView("teacher");
-  startTicking(() => UI.renderTeacher(session));
+  startTicking(hostTick);
+}
+
+/** The host's per-second beat. Presence is swept here rather than left to
+ *  conn.on("close"), which a closed tab frequently never fires. */
+function hostTick() {
+  if (!previewing && sweepStale(session)) syncAll();
+  UI.renderTeacher(session);
 }
 
 /** Push saved params back into the form — matters on resume, where the HTML
@@ -222,7 +229,13 @@ function wireHost() {
 
   Net.on(MSG.PING, (_payload, peerId) => {
     const s = session.students[peerId];
-    if (s) s.lastSeen = Date.now();
+    if (!s) return;
+    s.lastSeen = Date.now();
+    if (!s.connected) {          // came back without a reload
+      s.connected = true;
+      pushLog(session, `${s.name} is back in contact`);
+      syncAll();
+    }
   });
 
   Net.on(MSG.OFFER, (payload, peerId) => handleOffer(peerId, payload));
@@ -485,10 +498,10 @@ function closeMarket() {
   });
   session.phase = session.round >= session.params.totalRounds ? PHASE.DONE : PHASE.BETWEEN;
   const t = session.market.trades.length;
-  const eff = efficiency(session);
-  pushLog(session,
-    `Round ${session.round} closed — ${t} trade${t === 1 ? "" : "s"}`
-    + (eff == null ? "" : `, ${Math.round(eff * 100)}% efficiency`),
+  // Efficiency is the instructor's number, not the students' — it's on the
+  // header tile and the S&D chart. Broadcasting it just told the class the
+  // answer before the discussion that's supposed to arrive at it.
+  pushLog(session, `Round ${session.round} closed — ${t} trade${t === 1 ? "" : "s"}`,
     { toStudents: true });
   syncAll();
 }

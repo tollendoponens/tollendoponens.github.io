@@ -81,13 +81,14 @@ individually better off trading. Anyone who does restrain themselves simply
 earns less than the classmates who don't, which is the same lesson from the
 other side. Both directions are worth naming in the debrief.
 
-On the instructor's side it moves the scoreboard: the Efficiency tile becomes
-**Social efficiency** (realized surplus plus spillover, over the best society
-could have done), the briefing gains a **social optimum** quantity beside the
-private one, and the S&D chart grows a dashed **social cost** curve — private
-cost minus the externality — with the social quantity marked. A negative
-spillover puts it above supply and the market over-trades; a positive one puts
-it below and the market under-trades.
+On the instructor's side it moves the scoreboard, without moving the label:
+efficiency **always** counts the spillover (see *Efficiency* below), so a
+market that over-trades a polluting good scores badly rather than scoring 100%
+for trading every privately profitable unit. The briefing gains a **social
+optimum** quantity beside the private one, and the S&D chart grows a dashed
+**social cost** curve — private cost minus the externality — with the social
+quantity marked. A negative spillover puts it above supply and the market
+over-trades; a positive one puts it below and the market under-trades.
 
 **Price controls.** The instructor can set a floor, a ceiling, both, or neither
 (blank = none); they apply immediately, at any point in a round. Offers outside
@@ -133,10 +134,19 @@ new column and any price may open it again.
 `value − price`. Both are computed per unit, totalled per round, and banked into
 a session total when the market closes.
 
+**The game total** sits in the student's top bar as `Game total +$42`, green
+when they're up and red when they're down, and it is there in every phase — it
+moves at each round close, not per trade. The round tile below it carries the
+round's own figure and, when a spillover is running, its breakdown. Those used
+to share one slot, which meant the running total disappeared for the whole of
+any round that carried a spillover — exactly the rounds where students most
+want to know where they stand. The instructor sees the same number for everyone
+in the roster's **Total** column.
+
 **Instructor benchmarks.** The header tiles show trades, average price, and
-efficiency — realized surplus as a share of the maximum available, with the
-competitive-equilibrium quantity and price band computed from the aggregate
-schedules. That's the number the discussion after the round is usually about.
+efficiency, with the competitive-equilibrium quantity and price band computed
+from the aggregate schedules. That's the number the discussion after the round
+is usually about. Students are not told it — see *Efficiency*.
 
 ## The offer chart
 
@@ -225,6 +235,47 @@ demand value for that unit.
 The curves appear the moment a round is **dealt**, before the market opens —
 which is the point: it's the panel to set floors and ceilings against.
 
+**That round's efficiency** is printed in the top-right of the plot and spelled
+out in dollars underneath, so stepping the picker through the rounds reads as a
+round-by-round scoreboard and not just a comparison of shapes. It is the
+selected good's number, scored against the schedules as they were dealt — and,
+like the price controls, an archived round is scored under the spillover it was
+actually played under, never one set afterwards.
+
+## Efficiency
+
+**One measure, one label.** Efficiency is realized surplus *including the
+spillover*, over the most society could have got:
+
+```
+efficiency = Σ (value − cost + externality) over trades
+           ÷ Σ (value − cost + externality) over units worth trading socially
+```
+
+With no externality set the spillover term is zero and this is the ordinary
+private number, so the tile never relabels itself and there is no second metric
+to keep straight.
+
+Measuring on the private basis was a bug worth naming, because it broke exactly
+the lesson the externality exists to teach: a market that trades every privately
+profitable unit scored **100%** no matter how much damage those trades did to
+everyone else. It now scores the damage. Trading *to the social optimum* scores
+100%; over-trading a polluting good and under-trading a beneficial one both
+score below it.
+
+Two edges are handled deliberately. A large enough external cost makes **no**
+unit worth trading — the denominator is zero, and then trading nothing is
+efficient (100%) while trading anything is not (0%). And the ratio is **floored
+at 0%** for display: a market can destroy more value than the best case
+creates, but the raw magnitude is unstable when the social optimum sits near
+zero, so the tile reports 0% and the dollar figures beside it carry how far past
+zero it went.
+
+**Students never see it.** Efficiency is on the instructor's tile and the S&D
+chart only; the round-close message tells the class how many trades happened and
+nothing more. Broadcasting the score handed them the answer before the
+discussion that's supposed to arrive at it.
+
 ## Roster paging
 
 Eight students per page, with `‹ Prev` / `Next ›` and a `9–16 of 20` counter;
@@ -241,6 +292,15 @@ re-registers the **same code**, so nothing on the students' side changes. The
 market comes back **frozen** with whatever time was left, so a stale deadline
 can't fire the instant you're back — unfreeze when the room is ready. *Discard
 it* clears the save.
+
+**Presence is judged on the heartbeat, not on the close event.** A closed tab
+frequently never fires WebRTC's `close`, so the roster used to show a student
+as connected indefinitely after they walked away. Students ping every 5
+seconds; the host sweeps once a second and anyone silent for **16 seconds**
+(three missed beats) is marked dropped and logged. A ping arriving from someone
+already marked dropped puts them straight back, logged the same way, without
+needing a reload. `onDisconnect` still fires when it can — the sweep is the
+backstop, not the replacement.
 
 **Student.** The name is the rejoin token: type the **same name** and you land
 back in your seat with your role, schedule, units already traded and running
@@ -310,6 +370,26 @@ charged the buyer and seller **nothing**, recorded −$36 against the seller's
 *caused* figure, and the sum of everyone's *borne* equalled the social total
 exactly. At close, the seller's total rose by their full +$7 gain while a
 bystander who traded nothing fell $2.
+
+The stale-presence sweep was exercised against the real clock: a student silent
+for 15 seconds stayed connected, 17 seconds flipped them to dropped and logged
+it once, a second sweep reported no change (so it can't re-broadcast every
+second), and a fresh ping restored them. Two simultaneous drops took the roster
+from 20 to 18 connected with the right dots going grey. The game total was
+checked positive, negative, zero and alongside a spillover, and the nav doesn't
+overflow at 1280, 900, 600 or 375px.
+
+The efficiency rewrite was checked against the real `state.js`, driven from the
+preview harness rather than a live class. Holding the market at the **private**
+equilibrium and sweeping the spillover, the old measure read 100% at every
+setting; the new one reads 100% only with no externality and falls to 52%, 0%,
+0% at −$0.25, −$0.50 and −$2 per person, and to 84% at **+$0.50**, where the
+market under-trades instead. Trading *to the social optimum* scores 100% at
+every setting, including the ones where the optimum is zero trades. Per-good
+figures on the S&D chart sum to the tile exactly ($13 of $124 tin plus $1 of $81
+copper against a $14-of-$205 tile), a spillover set mid-session moved the live
+round without back-dating onto the two archived ones, and the round-close
+message reaching students carries the trade count alone.
 
 Student inputs no longer lose focus: focus, typed value, caret position **and
 the DOM node itself** survive repeated render passes, while the ask price,

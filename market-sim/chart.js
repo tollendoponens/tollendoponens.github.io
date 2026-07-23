@@ -382,6 +382,12 @@ function renderSDChart(id, opts) {
           font-size="11" font-weight="700" fill="var(--text)"
           style="font-variant-numeric:tabular-nums">CE q=${ce.quantity}</text>` : "";
 
+  // The round's efficiency, so stepping the picker through rounds reads as a
+  // round-by-round scoreboard rather than just a shape comparison.
+  const effMark = opts.efficiency == null ? "" : `
+    <text x="${W - 8}" y="${SD_GEO.padT - 8}" text-anchor="end" font-size="11" font-weight="700"
+          fill="var(--text)" style="font-variant-numeric:tabular-nums">Efficiency ${efficiencyPct(opts.efficiency)}</text>`;
+
   const controls = [
     ceiling !== null ? { p: ceiling, label: `Ceiling ${money(ceiling)}` } : null,
     floor !== null ? { p: floor, label: `Floor ${money(floor)}` } : null,
@@ -404,7 +410,8 @@ function renderSDChart(id, opts) {
     + `from ${money(costs[0])} to ${money(costs[costs.length - 1])}, ${values.length} demand steps `
     + `from ${money(values[0])} down to ${money(values[values.length - 1])}. `
     + (ce.quantity ? `Equilibrium quantity ${ce.quantity} at ${money(ce.priceLo)}–${money(ce.priceHi)}.`
-                   : "No profitable trades exist.");
+                   : "No profitable trades exist.")
+    + (opts.efficiency == null ? "" : ` Efficiency ${efficiencyPct(opts.efficiency)}.`);
 
   el.innerHTML = `
     <div class="chart-legend">
@@ -419,7 +426,7 @@ function renderSDChart(id, opts) {
         ${grid}
         <line x1="${SD_GEO.padL - 8}" x2="${W - 6}" y1="${baseY}" y2="${baseY}"
               stroke="var(--border)" stroke-width="1"/>
-        ${qAxis}${controls}${curves}${ceMark}${socialMark}${bands}
+        ${qAxis}${controls}${curves}${ceMark}${socialMark}${effMark}${bands}
       </svg>
     </div>
     <div class="chart-caption">quantity →</div>
