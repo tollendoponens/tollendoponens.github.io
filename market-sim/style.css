@@ -1,0 +1,547 @@
+/* Classroom Sim — custom-green design system.
+ * Tokens and base components are lifted from custom-green.html; everything
+ * below the COMPONENTS banner is additive (kpi rows, roster, feed, modal…).
+ */
+
+/* ================= TOKENS ================= */
+
+:root {
+  --bg: #ffffff;
+  --surface: #f4faf7;
+  --border: #dcece3;
+  --text: #0f2019;
+  --text-dim: #5b7568;
+  --accent: #0e9f5f;
+  --accent-dark: #0a7a49;
+  --accent-light: #e6f7ee;
+
+  /* status colours — used for connection dots and state pills only */
+  --warn: #c98a06;
+  --warn-light: #fdf4e0;
+  --danger: #c0392b;
+  --danger-light: #fdeceb;
+
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(15, 32, 25, 0.04), 0 8px 24px rgba(15, 32, 25, 0.06);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+/* ================= LAYOUT ================= */
+
+.view { display: none; }
+.view.is-active { display: block; }
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.nav-brand { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
+.nav-actions { margin-left: auto; display: flex; gap: 10px; }
+
+.shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.shell-narrow { max-width: 560px; padding-top: 64px; }
+
+.row { display: grid; gap: 20px; }
+.row-3 { grid-template-columns: repeat(3, 1fr); }
+.row-4 { grid-template-columns: repeat(4, 1fr); }
+/* Reflows instead of crushing its fields — for forms inside a narrow column. */
+.row-fit { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.split { display: grid; grid-template-columns: 1.1fr 1fr; gap: 20px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 20px; }
+/* Grid/flex children default to min-width:auto, so wide content (the chart)
+   stretches its track instead of scrolling. Pin them to zero. */
+.split > *, .stack > *, .row > * { min-width: 0; }
+.stack-sm { display: flex; flex-direction: column; gap: 10px; }
+
+@media (max-width: 1000px) {
+  .split, .row-3, .row-4 { grid-template-columns: 1fr; }
+  .nav, .shell { padding-left: 18px; padding-right: 18px; }
+}
+
+/* ================= COMPONENTS ================= */
+
+.tag {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.tag-accent { background: var(--accent-light); color: var(--accent-dark); }
+.tag-neutral { background: #f1f5f2; color: var(--text-dim); }
+.tag-outline { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+.tag-warn { background: var(--warn-light); color: var(--warn); }
+.tag-danger { background: var(--danger-light); color: var(--danger); }
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-dark); }
+.btn-secondary { background: #fff; border-color: var(--border); color: var(--text); }
+.btn-secondary:hover { background: var(--surface); }
+.btn-ghost { background: transparent; color: var(--text-dim); padding: 6px 10px; font-size: 13px; }
+.btn-ghost:hover { background: var(--surface); color: var(--text); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-block { width: 100%; }
+
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+.card-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-dark);
+  margin-bottom: 4px;
+}
+.card-title { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 8px; }
+.card-head { display: flex; align-items: baseline; gap: 10px; }
+.card-head .card-title { margin-bottom: 0; }
+.card-note { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+
+.field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  display: block;
+  margin-bottom: 6px;
+}
+.input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font: inherit;
+  font-size: 14px;
+  background: var(--surface);
+  color: inherit;
+}
+.input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.input-sm { width: auto; padding: 6px 8px; font-size: 12px; font-weight: 600; background: #fff; }
+.input-code {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.seg-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.seg-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.seg-opt:has(input:checked) { background: var(--accent-light); color: var(--accent-dark); }
+
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.table td { padding: 7px 8px; border-bottom: 1px solid var(--surface); }
+.table tbody tr:last-child td { border-bottom: none; }
+.table-scroll { max-height: 320px; overflow-y: auto; }
+
+/* KPI tile — the big-number cards across the top of both dashboards. */
+.kpi-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-dark);
+  margin-bottom: 4px;
+}
+.kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Connection / readiness dot, paired with a tag or roster row. */
+.dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; flex: none; }
+.dot-live { background: var(--accent); }
+.dot-idle { background: #c3d3ca; }
+.dot-warn { background: var(--warn); }
+.dot-gone { background: var(--danger); }
+
+/* Roster: one row per connected student on the instructor dashboard. */
+.roster-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Activity feed / instructor broadcast log. */
+.feed { display: flex; flex-direction: column; gap: 2px; max-height: 340px; overflow-y: auto; }
+.feed-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--surface);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.feed-item:last-child { border-bottom: none; }
+.feed-time {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  flex: none;
+  padding-top: 1px;
+}
+
+/* Placeholder for a panel the simulation will fill in later. */
+.mount {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.empty { color: var(--text-dim); font-size: 13px; padding: 18px 0; text-align: center; }
+
+/* Roster pager — a 20-student class shouldn't run the page off the screen. */
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.pager-info {
+  font-size: 12px;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin: 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================= MARKET ================= */
+
+/* The standing sell offer — the number both roles are watching. */
+.ask-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+.ask-price {
+  font-size: 44px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+.ask-meta { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+.ask-box .tag { margin-left: auto; }
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+/* Pre-market briefing on the instructor's parameters card. */
+.briefing {
+  margin-top: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.briefing-head { display: flex; align-items: center; gap: 10px; }
+.briefing-head .tag { margin-left: auto; }
+.briefing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.briefing-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.briefing-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.briefing .card-note { margin: 8px 0 0; }
+
+/* Grouped sections inside the instructor's control cards. */
+.ctl-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.ctl-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-dark);
+  margin-bottom: 8px;
+}
+.ctl-inline {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.ctl-inline .field { width: 110px; }
+.ctl-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* Collapsed by default — the fiddly settings stay out of the way. */
+.ctl-details {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.ctl-details > summary {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-dark);
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ctl-details > summary::-webkit-details-marker { display: none; }
+.ctl-details > summary::before {
+  content: "▸";
+  font-size: 10px;
+  transition: transform 0.12s ease;
+}
+.ctl-details[open] > summary::before { transform: rotate(90deg); }
+
+/* Checkbox rows in the parameters card. */
+.check-row { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  line-height: 1.4;
+}
+.check input { margin-top: 2px; flex: none; }
+
+/* The spillover, stated plainly to the student — visible, and visibly not
+   theirs to pay. That gap is the lesson. */
+.spillover {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+.spillover .tag { flex: none; }
+/* Round summary: trading profit, what you inflicted, what you were charged. */
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--surface);
+}
+.summary-row.muted { color: var(--text-dim); }
+.summary-row.muted em { font-style: normal; opacity: 0.8; }
+.summary-row.total {
+  border-bottom: none;
+  border-top: 1px solid var(--border);
+  font-weight: 700;
+  margin-top: 2px;
+  padding-top: 10px;
+}
+#s-summary { margin-top: 14px; }
+
+/* One market block per good on the student dashboard. */
+.market-block + .market-block {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Fullscreen: the card fills the screen and its chart grows into it. */
+.card:fullscreen {
+  background: var(--bg);
+  border-radius: 0;
+  padding: 28px 36px;
+  overflow-y: auto;
+}
+.card:fullscreen .chart { height: auto; }
+.card:fullscreen .chart .table-scroll { max-height: none; }
+
+.num { font-variant-numeric: tabular-nums; }
+.pos { color: var(--accent-dark); font-weight: 600; }
+.neg { color: var(--danger); font-weight: 600; }
+.table tfoot td {
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  font-weight: 700;
+  padding-top: 9px;
+}
+
+/* ================= CHART ================= */
+
+/* Fixed box: the card must not resize as columns, rounds or views change. */
+.chart { margin-top: 10px; position: relative; height: 296px; }
+.chart .table-scroll { max-height: 262px; }
+.chart .mount { min-height: 262px; }
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-dash {
+  width: 14px;
+  border-top: 1px dashed var(--text-dim);
+  display: inline-block;
+}
+.chart-scroll { overflow-x: auto; overflow-y: hidden; }
+.chart-caption { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.chart-tip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--text);
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+/* ================= OVERLAYS ================= */
+
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 32, 25, 0.35);
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  padding: 20px;
+}
+.modal-overlay.is-open { display: flex; }
+.modal { width: 460px; max-width: 100%; max-height: 85vh; overflow-y: auto; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+
+.toast-wrap {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 30;
+}
+.toast {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 12px 16px;
+  font-size: 13px;
+  max-width: 320px;
+}
+
+/* Banner shown when the peer link drops — students see it, teacher rarely. */
+.banner {
+  display: none;
+  padding: 10px 32px;
+  background: var(--warn-light);
+  color: var(--warn);
+  font-size: 13px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+.banner.is-open { display: block; }

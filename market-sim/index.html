@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Double Auction</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     LANDING — role picker. Everyone starts here.
+     ============================================================ -->
+<section class="view" id="view-landing">
+  <nav class="nav">
+    <div class="nav-brand">Double Auction</div>
+    <span class="tag tag-outline">classroom market</span>
+  </nav>
+
+  <main class="shell shell-narrow">
+    <!-- Only shown when this browser has an autosaved session to pick back up. -->
+    <div class="card" id="resume-card" hidden>
+      <div class="card-kicker">Instructor</div>
+      <div class="card-title">Resume your session</div>
+      <p class="card-note" id="resume-detail"></p>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button class="btn btn-primary" id="btn-resume">Resume</button>
+        <button class="btn btn-ghost" id="btn-discard">Discard it</button>
+      </div>
+      <p class="card-note" style="margin-top:10px;">
+        Students rejoin with the same code and the same name to get their seat,
+        role and schedule back.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="card-kicker">Instructor</div>
+      <div class="card-title">Run a session</div>
+      <p class="card-note">
+        This tab becomes the session host. Keep it open for the whole class —
+        every student connects through it.
+      </p>
+      <div class="stack-sm" style="margin-top:14px;">
+        <button class="btn btn-primary btn-block" id="btn-create">Create session</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-kicker">Student</div>
+      <div class="card-title">Join a session</div>
+      <p class="card-note">
+        You'll be assigned a role — producer or consumer — when you join.
+        If you get disconnected, rejoin with the <strong>same name</strong> to
+        pick up your seat exactly where you left it.
+      </p>
+      <div class="stack-sm" style="margin-top:14px;">
+        <div class="field">
+          <label for="join-code">Session code</label>
+          <input class="input input-code" id="join-code" maxlength="4" placeholder="ABCD" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="join-name">Your name or team</label>
+          <input class="input" id="join-name" placeholder="Team Ostrom" autocomplete="off">
+        </div>
+        <button class="btn btn-primary btn-block" id="btn-join">Join session</button>
+        <p class="card-note" id="join-error"></p>
+      </div>
+    </div>
+  </main>
+</section>
+
+
+<!-- ============================================================
+     INSTRUCTOR DASHBOARD
+     ============================================================ -->
+<section class="view" id="view-teacher">
+  <nav class="nav">
+    <div class="nav-brand">Double Auction</div>
+    <span class="tag tag-accent" id="t-code">CODE ····</span>
+    <span class="tag tag-outline" id="t-round">Round — of —</span>
+    <span class="tag tag-neutral" id="t-clock">--:--</span>
+    <span class="tag tag-neutral" id="t-phase">Lobby</span>
+    <div class="nav-actions">
+      <button class="btn btn-secondary" id="t-btn-pause">Freeze market</button>
+      <button class="btn btn-secondary" id="t-btn-broadcast">Message class</button>
+      <button class="btn btn-primary" id="t-btn-advance">Open market</button>
+    </div>
+  </nav>
+
+  <main class="shell">
+    <div class="row row-4">
+      <div class="card">
+        <div class="kpi-label">Connected</div>
+        <div class="kpi-value" id="t-kpi-connected">0</div>
+        <span class="tag tag-neutral" id="t-kpi-connected-sub">0 producers · 0 consumers</span>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Trades this round</div>
+        <div class="kpi-value" id="t-kpi-trades">0</div>
+        <span class="tag tag-outline" id="t-kpi-trades-sub">CE quantity —</span>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Average price</div>
+        <div class="kpi-value" id="t-kpi-price">—</div>
+        <span class="tag tag-outline" id="t-kpi-price-sub">CE band —</span>
+      </div>
+      <div class="card">
+        <div class="kpi-label" id="t-kpi-eff-label">Efficiency</div>
+        <div class="kpi-value" id="t-kpi-eff">—</div>
+        <span class="tag tag-neutral" id="t-kpi-eff-sub">of maximum surplus</span>
+      </div>
+    </div>
+
+    <div class="split">
+      <!-- Left column: controls + roster -->
+      <div class="stack">
+        <!-- LIVE CONTROLS — the things you touch while a round is running.
+             Kept first and always open; setup lives in the card below. -->
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-kicker">During the round</div>
+              <div class="card-title">Live controls</div>
+            </div>
+            <span class="tag tag-outline" style="margin-left:auto;" id="t-shock-tag">no shocks yet</span>
+          </div>
+
+          <!-- Pre-market briefing: what the dealt schedules imply, so controls
+               can be set against a known equilibrium before trading starts. -->
+          <div class="briefing" id="t-briefing">
+            <div class="briefing-head">
+              <span class="card-kicker" style="margin:0;">Before you open</span>
+              <span class="tag tag-outline" id="t-brief-phase">schedules not dealt</span>
+            </div>
+            <div class="briefing-grid">
+              <div><span class="briefing-label">CE price band</span><span class="briefing-value" id="t-brief-band">—</span></div>
+              <div><span class="briefing-label">CE quantity</span><span class="briefing-value" id="t-brief-qty">—</span></div>
+              <div><span class="briefing-label">Max surplus</span><span class="briefing-value" id="t-brief-surplus">—</span></div>
+              <div id="t-brief-social-cell" hidden>
+                <span class="briefing-label">Social optimum</span>
+                <span class="briefing-value" id="t-brief-social">—</span>
+              </div>
+            </div>
+            <p class="card-note" id="t-brief-note"></p>
+          </div>
+
+          <div class="ctl-section">
+            <div class="ctl-label">Price controls</div>
+            <div class="ctl-inline">
+              <div class="field">
+                <label for="t-param-floor">Floor</label>
+                <input class="input" id="t-param-floor" type="number" min="1" step="1" placeholder="none">
+              </div>
+              <div class="field">
+                <label for="t-param-ceiling">Ceiling</label>
+                <input class="input" id="t-param-ceiling" type="number" min="1" step="1" placeholder="none">
+              </div>
+              <button class="btn btn-secondary" id="t-btn-controls">Apply controls</button>
+            </div>
+            <p class="card-note">Blank means no limit. Takes effect immediately.</p>
+          </div>
+
+          <div class="ctl-section">
+            <div class="ctl-label">Shock</div>
+            <div class="ctl-inline">
+              <button class="btn btn-secondary" id="t-btn-shock">Supply shock…</button>
+              <p class="card-note" style="margin:0;flex:1;min-width:180px;">
+                Raises costs for some producers. Silent by default — the price
+                moves and nobody is told why.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SETUP — set before the session; collapsed sections keep it short. -->
+        <div class="card">
+          <div class="card-kicker">Before the session</div>
+          <div class="card-title">Setup</div>
+
+          <div class="ctl-section">
+            <div class="ctl-label">Rounds</div>
+            <div class="row row-fit">
+              <div class="field">
+                <label for="t-param-rounds">How many</label>
+                <input class="input" id="t-param-rounds" type="number" min="1" value="8">
+              </div>
+              <div class="field">
+                <label for="t-param-length">Length (sec)</label>
+                <input class="input" id="t-param-length" type="number" min="10" step="10" value="300">
+              </div>
+              <div class="field">
+                <label for="t-param-units">Units per student</label>
+                <input class="input" id="t-param-units" type="number" min="1" max="8" value="4">
+              </div>
+            </div>
+            <div class="seg" style="margin-top:10px;">
+              <label class="seg-opt"><input type="radio" name="t-mode" value="auto" checked><span>Timed rounds</span></label>
+              <label class="seg-opt"><input type="radio" name="t-mode" value="manual"><span>I close the market</span></label>
+            </div>
+          </div>
+
+          <div class="ctl-section">
+            <div class="ctl-label">Market design</div>
+            <div class="check-row">
+              <label class="check"><input type="checkbox" id="t-param-twogoods">
+                <span><strong>Two goods</strong> (Tin &amp; Copper) — one shared capacity, so buyers substitute</span></label>
+              <label class="check"><input type="checkbox" id="t-param-keep">
+                <span><strong>Keep schedules</strong> between rounds — needed before a shock means anything</span></label>
+            </div>
+          </div>
+
+          <details class="ctl-details">
+            <summary>Curve shape</summary>
+            <div class="row row-fit" style="margin-top:10px;">
+              <div class="field">
+                <label for="t-curve-preset">Preset</label>
+                <select class="input" id="t-curve-preset"><option value="">Choose…</option></select>
+              </div>
+              <div class="field">
+                <label for="t-curve-slow">Supply starts at</label>
+                <input class="input" id="t-curve-slow" type="number" min="1" value="4">
+              </div>
+              <div class="field">
+                <label for="t-curve-shigh">Supply ends at</label>
+                <input class="input" id="t-curve-shigh" type="number" min="1" value="16">
+              </div>
+              <div class="field">
+                <label for="t-curve-dhigh">Demand starts at</label>
+                <input class="input" id="t-curve-dhigh" type="number" min="1" value="16">
+              </div>
+              <div class="field">
+                <label for="t-curve-dlow">Demand ends at</label>
+                <input class="input" id="t-curve-dlow" type="number" min="1" value="4">
+              </div>
+              <div class="field">
+                <label for="t-curve-noise">Jitter (±$)</label>
+                <input class="input" id="t-curve-noise" type="number" min="0" max="5" value="1">
+              </div>
+            </div>
+            <p class="card-note">
+              A wider start-to-end spread is a steeper, less elastic curve.
+            </p>
+          </details>
+
+          <details class="ctl-details">
+            <summary>Externalities</summary>
+            <div class="row row-fit" style="margin-top:10px;">
+              <div class="field">
+                <label for="t-ext-tin">Tin — $ per person, per unit</label>
+                <input class="input" id="t-ext-tin" type="number" step="0.25" value="0">
+              </div>
+              <div class="field" id="t-ext-copper-field" hidden>
+                <label for="t-ext-copper">Copper — $ per person, per unit</label>
+                <input class="input" id="t-ext-copper" type="number" step="0.25" value="0">
+              </div>
+            </div>
+            <p class="card-note">
+              Charged to <strong>every student except the two in the trade</strong>,
+              as real money off their round. Negative is an external
+              <strong>cost</strong> (pollution), positive a <strong>benefit</strong>.
+              Quarters allowed, and you'll want them: at 20 students, $1 each is
+              $18 a unit socially, which swamps every trade. Students are told
+              about it — the point is that knowing changes nothing, since the
+              traders themselves never pay.
+            </p>
+          </details>
+
+          <div class="ctl-actions">
+            <button class="btn btn-secondary" id="t-btn-apply">Apply setup</button>
+            <button class="btn btn-ghost" id="t-btn-reroll">Re-roll schedules</button>
+            <button class="btn btn-ghost" id="t-btn-reset" style="margin-left:auto;">Reset session</button>
+          </div>
+          <p class="card-note">Structure and shape take effect at the next deal.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-kicker">Roster</div>
+              <div class="card-title">Students</div>
+            </div>
+            <span class="tag tag-outline" style="margin-left:auto;" id="t-roster-count">0 connected</span>
+          </div>
+          <div class="table-scroll" style="margin-top:8px;">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Role</th>
+                  <th>Units</th>
+                  <th>Round profit</th>
+                  <th>Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="t-roster-body"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="t-roster-empty">
+            No students yet. Share the session code and the page URL.
+          </div>
+          <div class="pager" id="t-roster-pager" hidden>
+            <button class="btn btn-ghost" id="t-roster-prev">‹ Prev</button>
+            <span class="pager-info" id="t-roster-info">—</span>
+            <button class="btn btn-ghost" id="t-roster-next">Next ›</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-kicker">This round</div>
+          <div class="card-title">Trades</div>
+          <div class="table-scroll" style="margin-top:8px;">
+            <table class="table">
+              <thead>
+                <tr><th>#</th><th>Price</th><th>Seller</th><th>Buyer</th><th>Surplus</th></tr>
+              </thead>
+              <tbody id="t-trades-body"></tbody>
+            </table>
+          </div>
+          <div class="empty" id="t-trades-empty">No trades yet this round.</div>
+        </div>
+      </div>
+
+      <!-- Right column: the offer chart + log -->
+      <div class="stack">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-kicker">Live market</div>
+              <div class="card-title">Offers, in the order posted</div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+              <select class="input input-sm" data-chart-good="t-chart" aria-label="Which good to chart" hidden></select>
+              <select class="input input-sm" data-chart-round="t-chart" aria-label="Which round to chart"></select>
+              <button class="btn btn-ghost" data-chart-toggle="t-chart">Table</button>
+              <button class="btn btn-ghost" data-chart-full="t-chart" title="Fullscreen">⤢</button>
+            </div>
+          </div>
+          <div class="chart" id="t-chart"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-kicker">Instructor only</div>
+              <div class="card-title">Supply &amp; demand</div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+              <select class="input input-sm" id="t-sd-good" data-sd-good="1"
+                      aria-label="Which good's curves to plot" hidden></select>
+              <select class="input input-sm" id="t-sd-select" data-sd-round="1"
+                      aria-label="Which round's schedules to plot"></select>
+              <button class="btn btn-ghost" data-chart-full="t-sd" title="Fullscreen">⤢</button>
+            </div>
+          </div>
+          <div class="chart" id="t-sd"></div>
+          <p class="card-note" id="t-sd-note"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-kicker">This session</div>
+          <div class="card-title">Activity log</div>
+          <div class="feed" id="t-feed"></div>
+          <div class="empty" id="t-feed-empty">Nothing yet.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+
+<!-- ============================================================
+     STUDENT DASHBOARD — one markup, two roles.
+     ============================================================ -->
+<section class="view" id="view-student">
+  <nav class="nav">
+    <div class="nav-brand">Double Auction</div>
+    <span class="tag tag-accent" id="s-name">—</span>
+    <span class="tag tag-outline" id="s-role">—</span>
+    <span class="tag tag-outline" id="s-round">Round — of —</span>
+    <span class="tag tag-neutral" id="s-clock">--:--</span>
+    <div class="nav-actions">
+      <span class="tag tag-neutral" id="s-conn"><span class="dot dot-idle"></span> connecting</span>
+    </div>
+  </nav>
+  <div class="banner" id="s-banner">Connection lost — trying to reconnect…</div>
+
+  <main class="shell">
+    <div class="row row-3">
+      <div class="card">
+        <div class="kpi-label">Profit this round</div>
+        <div class="kpi-value" id="s-kpi-profit">—</div>
+        <span class="tag tag-neutral" id="s-kpi-profit-sub">session total —</span>
+      </div>
+      <div class="card">
+        <div class="kpi-label" id="s-kpi-units-label">Units sold</div>
+        <div class="kpi-value" id="s-kpi-units">—</div>
+        <span class="tag tag-outline" id="s-kpi-units-sub">of —</span>
+      </div>
+      <div class="card">
+        <div class="kpi-label">Market</div>
+        <div class="kpi-value" id="s-kpi-status">Closed</div>
+        <span class="tag tag-outline" id="s-kpi-status-sub">waiting for the instructor</span>
+      </div>
+    </div>
+
+    <div class="split">
+      <!-- Left column: one market block per good, then the schedules -->
+      <div class="stack">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-kicker">The market</div>
+              <div class="card-title" id="s-market-title">Current sell offer</div>
+            </div>
+            <span class="tag tag-outline" style="margin-left:auto;" id="s-capacity">—</span>
+          </div>
+          <div id="s-controls" class="controls-row" hidden></div>
+          <!-- Rebuilt per good on every render. -->
+          <div id="s-markets"></div>
+          <div class="empty" id="s-market-closed">
+            The market is closed. It opens when the instructor says so.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-kicker">Your schedule</div>
+              <div class="card-title" id="s-sched-title">Your units</div>
+            </div>
+            <span class="tag tag-outline" style="margin-left:auto;" id="s-sched-tag">—</span>
+          </div>
+          <div id="s-schedules"></div>
+          <div id="s-summary"></div>
+          <div class="empty" id="s-units-empty">
+            Your schedule is dealt when the instructor opens the market.
+          </div>
+        </div>
+      </div>
+
+      <!-- Right column: the same offer chart everyone sees, + messages -->
+      <div class="stack">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-kicker">Live market</div>
+              <div class="card-title">Offers, in the order posted</div>
+            </div>
+            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+              <select class="input input-sm" data-chart-good="s-chart" aria-label="Which good to chart" hidden></select>
+              <select class="input input-sm" data-chart-round="s-chart" aria-label="Which round to chart"></select>
+              <button class="btn btn-ghost" data-chart-toggle="s-chart">Table</button>
+              <button class="btn btn-ghost" data-chart-full="s-chart" title="Fullscreen">⤢</button>
+            </div>
+          </div>
+          <div class="chart" id="s-chart"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-kicker">From the instructor</div>
+          <div class="card-title">Messages</div>
+          <div class="feed" id="s-feed"></div>
+          <div class="empty" id="s-feed-empty">No messages yet.</div>
+        </div>
+      </div>
+    </div>
+  </main>
+</section>
+
+
+<!-- Shared overlays -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="card modal">
+    <div class="card-kicker" id="modal-kicker">Instructor</div>
+    <div class="card-title" id="modal-title">Title</div>
+    <div id="modal-body"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="modal-cancel">Cancel</button>
+      <button class="btn btn-primary" id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="state.js"></script>
+<script src="net.js"></script>
+<script src="chart.js"></script>
+<script src="ui.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
