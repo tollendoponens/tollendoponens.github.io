@@ -19,8 +19,11 @@ const MSG = {
   STATE: "state",        // full studentView() snapshot
   TOAST: "toast",        // transient notice
   KICK: "kick",
+  // host -> projector
+  SCREEN: "screen",      // screenView(): public market only, no private values
   // student -> host
   HELLO: "hello",
+  WATCH: "watch",        // a projector attaching — takes no seat, gets no schedule
   PING: "ping",
   // Both sides post, and either side may accept what the other has left
   // resting — that pair of pairs is what makes it a double auction.

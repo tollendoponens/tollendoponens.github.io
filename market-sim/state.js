@@ -524,6 +524,47 @@ function publicMarket(state) {
   };
 }
 
+/** The trade log as the room may see it: who traded with whom, at what price.
+ *  Never the cost or value behind it — those are the private numbers the whole
+ *  design keeps off the wire, and a projector is the least private screen in
+ *  the building. */
+function publicTrades(state) {
+  return state.market.trades.map((t, i) => ({
+    n: i + 1,
+    good: t.good,
+    price: t.price,
+    sellerName: t.sellerName,
+    buyerName: t.buyerName,
+    ts: t.ts,
+  }));
+}
+
+/** Everything a projector may show, and nothing else: no schedules, no costs,
+ *  no values, no per-student totals. Deliberately not studentView() with the
+ *  private part blanked — this is built from public pieces only, so there is
+ *  nothing to accidentally leave in. */
+function screenView(state) {
+  const p = state.params;
+  return {
+    code: state.code,
+    phase: state.phase,
+    round: state.round,
+    endsAt: state.endsAt,
+    params: {
+      totalRounds: p.totalRounds,
+      unitsPerPlayer: p.unitsPerPlayer,
+      priceFloor: p.priceFloor,
+      priceCeiling: p.priceCeiling,
+    },
+    goods: activeGoods(state),
+    headcount: studentList(state).length,
+    connected: connectedCount(state),
+    market: publicMarket(state),
+    trades: publicTrades(state),
+    messages: state.log.filter((e) => e.toStudents),
+  };
+}
+
 function studentView(state, id) {
   const me = state.students[id];
   // Students DO see the spillover. The lesson isn't that they're ignorant of

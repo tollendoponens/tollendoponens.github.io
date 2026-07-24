@@ -308,10 +308,6 @@ const UI = {
 
     UI.renderSchedules(view, me, isProducer, goods);
     UI.renderFeed(view.messages || [], $("s-feed"), $("s-feed-empty"));
-    renderOfferChart("s-chart", {
-      market: view.market, round: view.round, archive: view.market.rounds,
-      params: view.params, goods,
-    });
   },
 
   /** One schedule table per good. With two goods, capacity is shared, so the
@@ -396,19 +392,99 @@ const UI = {
   },
 
 
-  setConnection(status) {
-    const el = $("s-conn");
-    const map = {
-      connecting: ["dot-idle", "connecting", "tag-neutral"],
-      live: ["dot-live", "connected", "tag-accent"],
-      lost: ["dot-gone", "disconnected", "tag-danger"],
-    };
-    const [dot, label, tag] = map[status] || map.connecting;
-    el.className = `tag ${tag}`;
-    el.innerHTML = `<span class="dot ${dot}"></span> ${label}`;
-    $("s-banner").classList.toggle("is-open", status === "lost");
+  setConnection(status) { connectionTag("s-conn", "s-banner", status); },
+  setScreenConnection(status) { connectionTag("p-conn", "p-banner", status); },
+
+  /* ---------------- projected display ----------------
+   * Read-only, and built from screenView() alone — no schedules, no costs, no
+   * values, no per-student money. Sized to be read from the back of a room.
+   */
+
+  renderScreen(s) {
+    const goods = s.goods || ["tin"];
+    const open = s.phase === PHASE.OPEN;
+
+    $("p-code").textContent = `CODE ${s.code}`;
+    $("p-round").textContent = s.round
+      ? `Round ${s.round} of ${s.params.totalRounds}`
+      : `${s.params.totalRounds} rounds`;
+    $("p-clock").textContent = formatClock(secondsLeft(s));
+    $("p-phase").textContent = phaseLabel(s.phase);
+    $("p-phase").className = `tag ${phaseTagClass(s.phase)}`;
+    $("p-headcount").textContent = `${s.connected} of ${s.headcount} trading`;
+
+    // Price controls, when the instructor has set any.
+    const { priceFloor, priceCeiling } = s.params;
+    const hasControls = priceFloor != null || priceCeiling != null;
+    $("p-controls").hidden = !hasControls;
+    if (hasControls) {
+      $("p-controls").innerHTML = [
+        priceFloor != null ? `<span class="tag tag-warn">Floor ${money(priceFloor)}</span>` : "",
+        priceCeiling != null ? `<span class="tag tag-warn">Ceiling ${money(priceCeiling)}</span>` : "",
+      ].join(" ");
+    }
+
+    $("p-closed").hidden = open;
+    $("p-closed").textContent = closedMessage(s.phase);
+    $("p-books").hidden = !open;
+    $("p-books").innerHTML = !open ? "" : goods.map((g) => {
+      const b = (s.market.books || {})[g] || {};
+      const spread = b.ask && b.bid ? b.ask.price - b.bid.price : null;
+      return `
+        <div class="screen-book">
+          ${goods.length > 1 ? `<div class="screen-good">${goodName(g)}</div>` : ""}
+          <div class="book">
+            <div class="book-side">
+              <div class="book-label">Best buy offer</div>
+              <div class="book-price">${b.bid ? money(b.bid.price) : "—"}</div>
+              <div class="book-meta">${b.bid ? esc(b.bid.buyerName) : "nobody is bidding"}</div>
+            </div>
+            <div class="book-side">
+              <div class="book-label">Best sell offer</div>
+              <div class="book-price">${b.ask ? money(b.ask.price) : "—"}</div>
+              <div class="book-meta">${b.ask ? esc(b.ask.sellerName) : "nobody is offering"}</div>
+            </div>
+          </div>
+          ${spread == null ? "" : `<div class="screen-spread">spread ${money(spread)}</div>`}
+        </div>`;
+    }).join("");
+
+    UI.renderScreenTrades(s, goods);
+    renderOfferChart("p-chart", {
+      market: s.market, round: s.round, archive: s.market.rounds,
+      params: s.params, goods,
+    });
+  },
+
+  /** Newest first, so the projector never has to be scrolled to stay current. */
+  renderScreenTrades(s, goods) {
+    const t = s.trades || [];
+    $("p-trade-count").textContent = `${t.length} trade${t.length === 1 ? "" : "s"}`;
+    $("p-trades-empty").hidden = t.length > 0;
+    $("p-trades").innerHTML = t.slice().reverse().map((x) => `
+      <div class="trade-row">
+        <span class="trade-n">${x.n}</span>
+        <span class="trade-price">${money(x.price)}</span>
+        ${goods.length > 1 ? `<span class="tag tag-neutral">${goodName(x.good)}</span>` : ""}
+        <span class="trade-who">${esc(x.sellerName)} <span class="trade-arrow">→</span> ${esc(x.buyerName)}</span>
+        <span class="trade-time">${clockTime(x.ts)}</span>
+      </div>`).join("");
   },
 };
+
+function connectionTag(tagId, bannerId, status) {
+  const el = $(tagId);
+  if (!el) return;
+  const map = {
+    connecting: ["dot-idle", "connecting", "tag-neutral"],
+    live: ["dot-live", "connected", "tag-accent"],
+    lost: ["dot-gone", "disconnected", "tag-danger"],
+  };
+  const [dot, label, tag] = map[status] || map.connecting;
+  el.className = `tag ${tag}`;
+  el.innerHTML = `<span class="dot ${dot}"></span> ${label}`;
+  $(bannerId).classList.toggle("is-open", status === "lost");
+}
 
 /** Static skeleton for one good — built once per shape change, never on a tick,
  *  so the price input keeps its focus and its half-typed value. */

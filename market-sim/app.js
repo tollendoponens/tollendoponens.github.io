@@ -8,8 +8,14 @@
 
 let session = null;   // host: authoritative state
 let view = null;      // student: latest snapshot from the host
+let screenState = null;  // projector: latest public snapshot from the host
 let tick = null;
 let previewing = false;
+
+/* Peer ids of attached projectors. Deliberately NOT in session state: a
+ * display takes no seat, so it must not affect role balancing, the roster,
+ * the headcount, or the bystander count an externality is divided among. */
+const screens = new Set();
 
 /* ================= boot ================= */
 
@@ -53,14 +59,14 @@ window.addEventListener("DOMContentLoaded", () => {
     // Give the browser a frame to settle the new box before measuring it.
     setTimeout(() => {
       repaintChart("t-chart");
-      repaintChart("s-chart");
+      repaintChart("p-chart");
       if (session) UI.renderSD(session);
     }, 60);
   });
   window.addEventListener("resize", () => {
     if (!document.fullscreenElement) return;
     repaintChart("t-chart");
-    repaintChart("s-chart");
+    repaintChart("p-chart");
     if (session) UI.renderSD(session);
   });
 
@@ -68,9 +74,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
   $("btn-create").onclick = createSession;
   $("btn-join").onclick = joinSession;
+  $("btn-watch").onclick = watchSession;
   $("btn-resume").onclick = resumeSession;
   $("btn-discard").onclick = discardSaved;
   $("join-code").oninput = (e) => { e.target.value = e.target.value.toUpperCase(); };
+  $("watch-code").oninput = (e) => { e.target.value = e.target.value.toUpperCase(); };
   $("modal-cancel").onclick = UI.closeModal;
   $("modal-overlay").onclick = (e) => { if (e.target.id === "modal-overlay") UI.closeModal(); };
 
@@ -85,10 +93,11 @@ function repaintChart(id) {
       market: session.market, round: session.round, archive: session.rounds,
       params: session.params, goods: activeGoods(session),
     });
-  } else if (id === "s-chart" && view) {
+  } else if (id === "p-chart" && screenState) {
     renderOfferChart(id, {
-      market: view.market, round: view.round, archive: view.market.rounds,
-      params: view.params, goods: view.goods,
+      market: screenState.market, round: screenState.round,
+      archive: screenState.market.rounds,
+      params: screenState.params, goods: screenState.goods,
     });
   }
 }
@@ -238,12 +247,20 @@ function wireHost() {
     }
   });
 
+  // A projector attaching. It gets no student record at all, so it can't be
+  // dealt a schedule, can't be assigned a role, and never shows in the roster.
+  Net.on(MSG.WATCH, (_payload, peerId) => {
+    screens.add(peerId);
+    Net.sendTo(peerId, MSG.SCREEN, screenView(session));
+  });
+
   Net.on(MSG.OFFER, (payload, peerId) => handleOffer(peerId, payload));
   Net.on(MSG.BID, (payload, peerId) => handleBid(peerId, payload));
   Net.on(MSG.BUY, (payload, peerId) => handleBuy(peerId, payload));
   Net.on(MSG.SELL, (payload, peerId) => handleSell(peerId, payload));
 
   Net.onDisconnect((peerId) => {
+    if (screens.delete(peerId)) return;   // a display closing changes nothing
     const s = session.students[peerId];
     if (!s) return;
     s.connected = false;
@@ -542,9 +559,10 @@ function executeTrade(good, seller, sellerUnit, buyer, buyerUnit, price) {
     seller.caused += e * hit;
     buyer.caused += e * hit;
     if (hit) {
-      Net.broadcast(MSG.TOAST, (peerId) => (peerId === seller.id || peerId === buyer.id)
-        ? null
-        : { text: `${signedPlain(e)} from a ${goodName(good).toLowerCase()} trade you weren't part of.` });
+      Net.broadcast(MSG.TOAST, (peerId) =>
+        (peerId === seller.id || peerId === buyer.id || screens.has(peerId))
+          ? null
+          : { text: `${signedPlain(e)} from a ${goodName(good).toLowerCase()} trade you weren't part of.` });
     }
   }
 
@@ -902,7 +920,13 @@ function openInspector(id) {
 
 /** Push fresh state to every student and repaint the instructor view. */
 function syncAll() {
-  Net.broadcast(MSG.STATE, (peerId) => studentView(session, peerId));
+  // Students get their own slice; projectors get the public one. A screen must
+  // never be sent studentView(), which would carry a `me` and the full params.
+  Net.broadcast(MSG.STATE, (peerId) => screens.has(peerId) ? null : studentView(session, peerId));
+  if (screens.size) {
+    const pub = screenView(session);
+    screens.forEach((id) => Net.sendTo(id, MSG.SCREEN, pub));
+  }
   if (!previewing) saveSession(session);
   UI.renderTeacher(session);
 }
@@ -929,6 +953,39 @@ async function joinSession() {
     $("btn-join").disabled = false;
     $("btn-join").textContent = "Join session";
     $("join-error").textContent = err.message === "no-session"
+      ? "No session with that code. Check the letters with your instructor."
+      : "Could not connect. Try again.";
+  }
+}
+
+/* ================= projector ================= */
+
+/** Attach a read-only display. Code only — no name, because it takes no seat. */
+async function watchSession() {
+  const code = $("watch-code").value.trim().toUpperCase();
+  if (code.length !== 4) {
+    $("watch-error").textContent = "Enter the 4-letter code.";
+    return;
+  }
+  $("btn-watch").disabled = true;
+  $("btn-watch").textContent = "Connecting…";
+  Net.onStatus = (status) => UI.setScreenConnection(status);
+  try {
+    await Net.join(code);
+    // No TOAST handler here on purpose: a projector shows the market, not
+    // notices addressed to one person.
+    Net.on(MSG.SCREEN, (payload) => {
+      screenState = payload;
+      UI.renderScreen(screenState);
+    });
+    Net.on(MSG.KICK, () => { location.reload(); });
+    Net.send(MSG.WATCH, {});
+    UI.showView("screen");
+    startTicking(() => { if (screenState) UI.renderScreen(screenState); });
+  } catch (err) {
+    $("btn-watch").disabled = false;
+    $("btn-watch").textContent = "Open display";
+    $("watch-error").textContent = err.message === "no-session"
       ? "No session with that code. Check the letters with your instructor."
       : "Could not connect. Try again.";
   }
@@ -1092,7 +1149,17 @@ function startPreview(which) {
   runTrades(2);
   pushLog(session, "Round 3 — market open", { toStudents: true });
 
-  if (which === "student") {
+  if (which === "screen") {
+    // Leave orders resting on both sides so the projected book isn't empty.
+    goods.forEach((g, i) => {
+      handleOffer(producers[i % producers.length], { good: g, price: 17 - i });
+      handleBid(consumers[i % consumers.length], { good: g, price: 11 - i });
+    });
+    screenState = screenView(session);
+    UI.showView("screen");
+    UI.setScreenConnection("live");
+    startTicking(() => UI.renderScreen(screenState));
+  } else if (which === "student") {
     // ?role=consumer previews the buying side of the same market.
     const as = new URLSearchParams(location.search).get("role") === "consumer" ? "peer-1" : "peer-0";
     view = studentView(session, as);

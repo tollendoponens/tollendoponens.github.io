@@ -66,6 +66,81 @@
         <p class="card-note" id="join-error"></p>
       </div>
     </div>
+
+    <div class="card">
+      <div class="card-kicker">Projector</div>
+      <div class="card-title">Put the market on the screen</div>
+      <p class="card-note">
+        A read-only display of the live market for the front of the room — the
+        order book, the chart and the trade log. It takes no seat and can't
+        trade, so open it on the projector without using up a place in the class.
+      </p>
+      <div class="stack-sm" style="margin-top:14px;">
+        <div class="field">
+          <label for="watch-code">Session code</label>
+          <input class="input input-code" id="watch-code" maxlength="4" placeholder="ABCD" autocomplete="off">
+        </div>
+        <button class="btn btn-secondary btn-block" id="btn-watch">Open display</button>
+        <p class="card-note" id="watch-error"></p>
+      </div>
+    </div>
+  </main>
+</section>
+
+
+<!-- ============================================================
+     PRESENTATION — projected at the front of the room. Read-only,
+     public market only: no schedules, no costs, no values.
+     ============================================================ -->
+<section class="view" id="view-screen">
+  <nav class="nav">
+    <div class="nav-brand">Double Auction</div>
+    <span class="tag tag-accent" id="p-code">CODE ····</span>
+    <span class="tag tag-outline" id="p-round">Round — of —</span>
+    <span class="tag tag-neutral" id="p-clock">--:--</span>
+    <span class="tag tag-neutral" id="p-phase">Lobby</span>
+    <div class="nav-actions">
+      <span class="tag tag-neutral" id="p-headcount">— trading</span>
+      <span class="tag tag-neutral" id="p-conn"><span class="dot dot-idle"></span> connecting</span>
+    </div>
+  </nav>
+  <div class="banner" id="p-banner">Connection lost — trying to reconnect…</div>
+
+  <main class="shell screen">
+    <!-- Best bid and best ask per good, sized to be read from the back. -->
+    <div id="p-books"></div>
+    <div class="empty" id="p-closed">The market is closed.</div>
+    <div id="p-controls" class="controls-row" hidden></div>
+
+    <div class="split" style="margin-top:18px;">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-kicker">Live market</div>
+            <div class="card-title">Bids and offers, as posted</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+            <select class="input input-sm" data-chart-good="p-chart" aria-label="Which good to chart" hidden></select>
+            <select class="input input-sm" data-chart-round="p-chart" aria-label="Which round to chart"></select>
+            <button class="btn btn-ghost" data-chart-toggle="p-chart">Table</button>
+            <button class="btn btn-ghost" data-chart-full="p-chart" title="Fullscreen">⤢</button>
+          </div>
+        </div>
+        <div class="chart" id="p-chart"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <div class="card-kicker">This round</div>
+            <div class="card-title">Every trade</div>
+          </div>
+          <span class="tag tag-outline" style="margin-left:auto;" id="p-trade-count">0 trades</span>
+        </div>
+        <div class="trade-log" id="p-trades"></div>
+        <div class="empty" id="p-trades-empty">No trades yet.</div>
+      </div>
+    </div>
   </main>
 </section>
 
@@ -415,24 +490,10 @@
         </div>
       </div>
 
-      <!-- Right column: the same offer chart everyone sees, + messages -->
+      <!-- Right column: messages. The live market chart lives on the projected
+           display now — one shared picture at the front of the room, rather
+           than twenty small ones people read instead of trading. -->
       <div class="stack">
-        <div class="card">
-          <div class="card-head">
-            <div>
-              <div class="card-kicker">Live market</div>
-              <div class="card-title">Bids and offers, as posted</div>
-            </div>
-            <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-              <select class="input input-sm" data-chart-good="s-chart" aria-label="Which good to chart" hidden></select>
-              <select class="input input-sm" data-chart-round="s-chart" aria-label="Which round to chart"></select>
-              <button class="btn btn-ghost" data-chart-toggle="s-chart">Table</button>
-              <button class="btn btn-ghost" data-chart-full="s-chart" title="Fullscreen">⤢</button>
-            </div>
-          </div>
-          <div class="chart" id="s-chart"></div>
-        </div>
-
         <div class="card">
           <div class="card-kicker">From the instructor</div>
           <div class="card-title">Messages</div>

@@ -18,6 +18,7 @@ python -m http.server 8000
 - Instructor: <http://localhost:8000/?preview=teacher>
 - Producer: <http://localhost:8000/?preview=student>
 - Consumer: <http://localhost:8000/?preview=student&role=consumer>
+- Projected display: <http://localhost:8000/?preview=screen>
 
 Add `&goods=2` for the two-good market.
 
@@ -170,9 +171,43 @@ efficiency, with the competitive-equilibrium quantity and price band computed
 from the aggregate schedules. That's the number the discussion after the round
 is usually about. Students are not told it — see *Efficiency*.
 
+## The projected display
+
+A third view, for the front of the room. On the landing page, under *Put the
+market on the screen*, type **just the code** — no name — and the tab attaches
+as a read-only display.
+
+It shows the **best bid and best ask per good** at 64px with the spread under
+them, the **live order chart**, and a **scrolling log of every trade** (newest
+first, so it never needs scrolling to stay current). Between rounds the book
+hides and the chart and log stay up, which is the state you actually want while
+discussing what just happened.
+
+**It takes no seat.** A display is not a student: it gets no student record, no
+schedule and no role, never appears in the roster, and — the one that would
+quietly corrupt the economics — is **not counted among the bystanders an
+externality is divided between**. Attaching or closing one changes no number in
+the session and writes nothing to the feed.
+
+**It cannot see private values.** The display is fed by `screenView()`, which is
+built from public pieces only rather than by blanking fields out of
+`studentView()` — so there is nothing to accidentally leave in. The host's own
+trade records carry `cost` and `value`; `publicTrades()` strips both, and the
+trade log shows only who traded with whom at what price. No schedules, no
+per-student money, no totals.
+
+The student dashboard **no longer carries the chart** — one shared picture at
+the front of the room, rather than twenty small ones people read instead of
+trading. Students keep their order book, their schedule and the instructor's
+messages.
+
+A projector that loses the host does not auto-reattach: reload and re-enter the
+code, the same as a student rejoining.
+
 ## The order chart
 
-Both dashboards render the same chart: **one column per trade**, now carrying
+The instructor dashboard and the projected display render the same chart:
+**one column per trade**, now carrying
 **both ladders**. Every order posted in the run-up to a trade is a dot in that
 column: sell offers in blue walking *down*, buy offers in orange walking *up*,
 since each must improve on the last. A column therefore reads as the two sides
@@ -206,9 +241,9 @@ round and the chart moves with it. Pinning a specific round instead keeps it
 pinned; a 1Hz repaint won't knock the selection loose or close the dropdown
 under your cursor. In the all-rounds view, trades are numbered within their own
 round, and **round boundaries are marked by a dashed rule** — so you can watch
-prices converge across the session in one picture. Both dashboards get the same
-control; students' archived rounds go through the same private-value stripping
-as the live one.
+prices converge across the session in one picture. The instructor dashboard and
+the projected display both get this control, and the display's archived rounds
+go through the same private-value stripping as its live one.
 
 ## Running the Hayek demonstration
 
@@ -357,9 +392,9 @@ Requirements: internet for everyone, and a network that permits WebRTC.
 
 | File | Role |
 |---|---|
-| `index.html` | Three views: landing, instructor dashboard, student dashboard |
+| `index.html` | Four views: landing, instructor dashboard, student dashboard, projected display |
 | `style.css` | custom-green tokens + components |
-| `state.js` | State shape, schedules, surplus, equilibrium, per-student view filter |
+| `state.js` | State shape, schedules, surplus, equilibrium, the student and display view filters |
 | `net.js` | PeerJS transport: host/join, envelope, broadcast. No rules. |
 | `chart.js` | The offer chart (plot + table view + hover) |
 | `ui.js` | Pure render functions |
@@ -397,6 +432,23 @@ charged the buyer and seller **nothing**, recorded −$36 against the seller's
 *caused* figure, and the sum of everyone's *borne* equalled the social total
 exactly. At close, the seller's total rose by their full +$7 gain while a
 bystander who traded nothing fell $2.
+
+The projected display was checked for the two things that would actually matter
+in a room. **It leaks nothing**: the payload was scanned for `units`, `cost`,
+`value`, `totalProfit`, `borne`/`caused`, `students`, `externality`, `me` and
+`schedules` and carries none of them — the host's trade records hold `cost` and
+`value`, the display's hold neither. **It takes no seat**: attaching one left
+students at 20, connected at 19 and the externality's bystander count at 18, put
+nothing in the roster, and closing it logged nothing. Routing was confirmed
+per-peer — students received `state`, the display received `screen` and never
+`state`. The trade log scrolls at 25 trades instead of growing its card, newest
+first; the book, chart and log were checked open, between rounds, frozen with
+price controls, and in the lobby; two goods render two books with their own
+spreads; and no view overflows at 1920, 1440, 1280 or 900px.
+
+One hazard was caught and fixed before it could bite: the projector's state
+global was named `screen`, which shadows the built-in `window.screen` for every
+script on the page. Renamed to `screenState`; `window.screen` verified intact.
 
 The double auction was driven through the real host rules, on deterministic
 schedules, not through the preview script. Both sides rest and both improvement
