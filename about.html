@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About · Victor Chung</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+<script src="nav.js"></script>
+
+<main class="sheet wrap">
+
+  <section class="split">
+    <div class="split__body">
+      <h1 class="sheet__title">About</h1>
+
+      <div class="prose">
+        <p>Before moving to more boring things, I completed a Bachelor of Music from the Faculty of Music at the University of Toronto, where I studied violin with <a href="https://markfewer.com/" target="_blank" rel="noopener">Mark Fewer</a>.</p>
+        <p>The title of my website refers to the logical inference <a href="https://en.wikipedia.org/wiki/modus_tollendo_ponens" target="_blank" rel="noopener">modus tollendo ponens</a>:</p>
+        <figure class="proof proof--done" data-proof aria-label="Derivation of P from P or Q and not Q">
+          <div class="proof__body">
+            <div class="proof__line proof__line--show" data-step="0">
+              <span class="proof__num">1.</span>
+              <span class="proof__fml"><span class="proof__kw">Show</span> P</span>
+              <span class="proof__just proof__close">DD</span>
+            </div>
+            <div class="proof__sub">
+              <div class="proof__line" data-step="1"><span class="proof__num">2.</span><span class="proof__fml">P ∨ Q</span><span class="proof__just">PR</span></div>
+              <div class="proof__line" data-step="2"><span class="proof__num">3.</span><span class="proof__fml">~Q</span><span class="proof__just">PR</span></div>
+              <div class="proof__line" data-step="3"><span class="proof__num">4.</span><span class="proof__fml">P</span><span class="proof__just">MTP 2,3</span></div>
+            </div>
+          </div>
+        </figure>
+        <p class="proof__status visually-hidden" aria-live="polite"></p>
+        <p>It alludes to the idea that normative evaluations are best made <a href="https://doi.org/10.1086%2F466657" target="_blank" rel="noopener">comparatively</a>.</p>
+      </div>
+    </div>
+
+    <figure class="photo">
+      <img class="frame" src="violin.jpg" alt="Young Victor in a shirt and tie, playing the violin at home">
+      <figcaption class="photo__caption">The next time you think about raising an objection, remember that this is who you're speaking to.</figcaption>
+    </figure>
+  </section>
+
+</main>
+
+<script src="proof.js"></script>
+
+</body>
+</html>

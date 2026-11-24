@@ -1,0 +1,489 @@
+/* ==========================================================
+   Victor Chung: site stylesheet
+   ========================================================== */
+
+:root {
+  /* colour */
+  --paper:      #fff;
+  --text:       #16181d;
+  --text-2:     #4a4f59;
+  --text-3:     #8b909a;
+  --rule:       #e4e6ea;
+  --rule-2:     #c3c7ce;
+  --blue:       #1f4e8c;
+  --blue-deep:  #163a69;
+
+  /* type */
+  --font-head: Charter, 'Bitstream Charter', 'Sitka Text', Cambria, Georgia, serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* size scale: every font size on the site comes from this list */
+  --size-xs:   0.7rem;   /* all-caps labels, buttons on papers   */
+  --size-sm:   0.78rem;  /* menu, school names, footer           */
+  --size-md:   0.86rem;  /* interests, abstracts, contact items  */
+  --size-base: 0.95rem;  /* body text                            */
+  --size-lg:   1.1rem;   /* name in top bar, paper titles        */
+  --size-2xl:  1.9rem;   /* page headings                        */
+  --size-3xl:  2.3rem;   /* name on home page                    */
+
+  /* layout */
+  --measure:  68rem;
+  --gutter:   clamp(1.25rem, 8vw, 7rem);
+  --bar:      3.5rem;
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  background: var(--paper);
+  color: var(--text);
+  font: 400 var(--size-base)/1.65 var(--font-body);
+}
+
+h1, h2, h3, p, ul, ol { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+img { max-width: 100%; }
+a { color: inherit; }
+
+.wrap {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* small all-caps label, used in several places */
+.label {
+  font-size: var(--size-xs);
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.label--blue { color: var(--blue); }
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.masthead .wrap {
+  height: var(--bar);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.masthead__name {
+  font-family: var(--font-head);
+  font-size: var(--size-lg);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.masthead__menu {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
+
+.masthead__menu a {
+  font-size: var(--size-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--text-2);
+}
+
+.masthead__menu a:hover,
+.masthead__menu a[aria-current="page"] { color: var(--blue); }
+
+.masthead__menu .masthead__cv {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.masthead__menu .masthead__cv:hover {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+/* popup shown instead of opening the CV (nav.js) */
+.cv-note {
+  position: fixed;
+  z-index: 20;
+  padding: 0.35rem 0.65rem;
+  border-radius: 3px;
+  background: var(--text);
+  color: #fff;
+  font-family: var(--font-head);
+  font-size: var(--size-sm);
+  font-style: italic;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.cv-note--open { opacity: 1; transform: none; }
+
+/* ---------- page body ---------- */
+
+.sheet { padding-block: 2.25rem 4rem; }
+
+.sheet__title {
+  font-family: var(--font-head);
+  font-size: var(--size-2xl);
+  font-weight: 400;
+  line-height: 1.2;
+  margin-bottom: 1.75rem;
+}
+
+.prose { max-width: 40rem; }
+.prose p { margin-bottom: 1.1em; line-height: 1.8; }
+.prose a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+.prose a:hover { color: var(--blue-deep); }
+.prose img { display: block; margin-block: 0.25rem; }
+
+/* ---------- photo + text layout (home and about) ----------
+   One photo frame beside a text column, with the same gap on every
+   page. Home puts the photo on the left, About on the right. */
+
+.split {
+  display: flex;
+  gap: 2.75rem;
+  align-items: flex-start;
+}
+
+.split__body { flex: 1; max-width: 40rem; }
+
+.frame {
+  flex: 0 0 12.5rem;
+  width: 12.5rem;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: 50% 20%;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+  background: #f3f4f6; /* shows while empty or loading */
+}
+
+/* a framed photo with a caption underneath (About page) */
+.photo { flex: 0 0 12.5rem; width: 12.5rem; margin: 0; }
+.photo .frame { display: block; width: 100%; }
+
+.photo__caption {
+  margin-top: 0.6rem;
+  font-size: var(--size-sm);
+  font-style: italic;
+  line-height: 1.55;
+  color: var(--text-3);
+}
+
+/* ---------- home: intro ---------- */
+
+.intro__name {
+  font-family: var(--font-head);
+  font-size: var(--size-3xl);
+  font-weight: 400;
+  line-height: 1.15;
+  margin-bottom: 0.9rem;
+}
+
+.intro__lede { line-height: 1.75; margin-bottom: 1.1rem; }
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 1.1rem;
+  border-radius: 3px;
+  background: var(--blue);
+  color: #fff;
+  font-size: var(--size-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+
+.button:hover { background: var(--blue-deep); }
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem 2rem;
+  margin-top: 1.6rem;
+}
+
+.facts .label { display: block; margin-bottom: 0.45rem; }
+
+.facts__list { font-size: var(--size-md); color: var(--text-2); }
+.facts__list li + li { margin-top: 0.15rem; }
+
+.facts__list--dashed li::before {
+  content: '–';
+  margin-right: 0.45rem;
+  color: var(--blue);
+  opacity: 0.55;
+}
+
+.facts__list--stacked li + li { margin-top: 0.55rem; }
+.facts__degree { display: block; color: var(--text); }
+.facts__place  { display: block; font-size: var(--size-sm); color: var(--text-3); }
+
+.facts__list--contact li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.facts__list--contact li + li { margin-top: 0.55rem; }
+.facts__list--contact svg { flex: none; position: relative; top: 0.12em; color: var(--blue); opacity: 0.7; }
+.facts__list--contact a { text-decoration: none; }
+.facts__list--contact a:hover { color: var(--blue); text-decoration: underline; }
+
+/* ---------- publications ---------- */
+
+.works { border-top: 1px solid var(--rule); }
+
+/* Each paper is a row: year | title + venue | links.
+   The abstract opens underneath, below the title and venue. */
+.work {
+  display: grid;
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+  column-gap: 1.25rem;
+  align-items: start;
+  padding-block: 1rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.work__main { min-width: 0; }
+
+.work__title {
+  font-family: var(--font-head);
+  font-size: var(--size-lg);
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.work__title a { text-decoration: none; }
+.work__title a:hover { color: var(--blue); }
+
+/* citation line under the title: journal in italics, then volume(issue): pages */
+.work__venue {
+  margin-top: 0.2rem;
+  font-size: var(--size-md);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+
+.work__actions {
+  display: flex;
+  gap: 1.1rem;
+  margin-top: 0.15rem; /* sit level with the title */
+  white-space: nowrap;
+}
+
+/* PDF link and Abstract toggle: plain blue text, not boxes */
+.work__action {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font: 400 var(--size-sm)/1.5 var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* underline only the word, not the icon or the +/− */
+.work__action:hover span { text-decoration: underline; text-underline-offset: 0.18em; }
+
+/* + when closed, − when open */
+.work__toggle::before { content: '+'; display: inline-block; width: 0.6em; font-weight: 600; }
+.work__toggle[aria-expanded="true"]::before { content: '−'; }
+
+.work__abstract {
+  grid-column: 2 / -1;
+  max-width: 42rem;
+  margin-top: 0.7rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid color-mix(in srgb, var(--blue) 25%, transparent);
+  font-size: var(--size-md);
+  line-height: 1.75;
+  color: var(--text-2);
+}
+
+.work__year {
+  font-family: var(--font-head);
+  font-size: var(--size-lg);
+  line-height: 1.35;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* ---------- about: derivation box ----------
+   Show-line derivation in the style of logic-course software:
+   numbered lines, a "Show" goal, subsidiary lines indented under a
+   bracket. Visitors click the box to reveal it a line at a time; at
+   the end "Show" is cancelled and the bracket closes into a box.
+   proof.js adds --live (clickable) and --done (last step). */
+
+.proof {
+  --num:    2rem;     /* line-number column */
+  --gap:    0.6rem;
+  --indent: 1.1rem;   /* how far subsidiary lines sit in from the Show line */
+  max-width: 25rem;
+  margin: 0.5rem 0 1.4rem;
+  border: 1px solid var(--rule-2);
+  border-radius: 3px;
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: var(--size-md);
+}
+
+/* the whole box is the click target */
+.proof--live { cursor: pointer; user-select: none; transition: border-color 0.2s; }
+.proof--live:hover { border-color: var(--text-3); }
+.proof--live:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+.proof__body {
+  min-height: 9.4rem; /* room for all four lines, so the box doesn't grow as you click */
+  padding: 0.6rem 0.8rem 0.6rem;
+}
+
+.proof__line {
+  display: grid;
+  grid-template-columns: var(--num) minmax(0, 1fr) 6.5rem;
+  gap: var(--gap);
+  align-items: center;
+  min-height: 1.95rem;
+}
+
+.proof__line[hidden] { display: none; }
+
+.proof__num  { color: var(--text-3); text-align: right; }
+.proof__fml  { color: var(--text); white-space: nowrap; }
+.proof__just { color: var(--text-2); }
+
+/* each newly revealed line eases in */
+.proof__line--new { animation: proof-line-in 0.28s ease-out; }
+
+@keyframes proof-line-in {
+  from { opacity: 0; transform: translateY(-0.2rem); }
+}
+
+/* the Show line */
+.proof__kw { margin-right: 0.6em; color: var(--text-2); }
+.proof__close { color: var(--blue); font-weight: 600; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+
+.proof--done .proof__kw {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+  text-decoration-color: var(--text);
+}
+.proof--done .proof__line--show .proof__fml { color: var(--blue); font-weight: 600; }
+.proof--done .proof__close { opacity: 1; visibility: visible; }
+
+/* subsidiary lines: indented, with a bracket down their left side that
+   closes into a box when the derivation is done */
+.proof__sub { position: relative; padding-block: 0.1rem; }
+.proof__sub .proof__fml { margin-left: var(--indent); }
+
+.proof__sub::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--num) + var(--gap) + var(--indent) * 0.45);
+  right: -0.35rem;
+  border-left: 1px solid var(--text-3);
+  border-radius: 1px;
+  pointer-events: none;
+  transition: border-color 0.3s;
+}
+
+.proof__sub:not(:has(.proof__line:not([hidden])))::before { display: none; } /* no bracket before line 2 */
+.proof--done .proof__sub::before { border: 1px solid var(--text-2); }
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proof__line--new { animation: none; }
+  .proof__close, .proof__sub::before { transition: none; }
+}
+
+/* ---------- colophon ---------- */
+
+.colophon {
+  padding: 1.75rem 1.25rem;
+  border-top: 1px solid var(--rule);
+  text-align: center;
+  font-size: var(--size-sm);
+  color: var(--text-3);
+}
+
+/* ---------- page entrance ----------
+   Each page's content eases in when it loads; the top bar and
+   footer stay still. */
+
+.sheet { animation: sheet-in 0.25s ease-out; }
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(0.4rem); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet { animation: none; }
+}
+
+/* ---------- small screens ---------- */
+
+@media (max-width: 44rem) {
+  .masthead__menu { gap: 0.9rem; }
+  .masthead__menu a { font-size: var(--size-xs); }
+  .split { flex-direction: column; gap: 1.5rem; }
+  .frame, .photo { width: 10rem; flex-basis: auto; }
+  .photo .frame { width: 100%; }
+  /* papers: links drop below the title */
+  .work { grid-template-columns: 3.25rem minmax(0, 1fr); }
+  .work__actions { grid-column: 2; margin-top: 0.4rem; }
+}
+
+@media (max-width: 30rem) {
+  .masthead__name { display: none; }
+  .masthead .wrap { justify-content: center; }
+}
